@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { getInvoiceFileUrl } from "@/app/actions/invoices";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -52,11 +52,23 @@ export default function InvoicesPage() {
     }
   }
 
+  const invoicesTotal = useMemo(
+    () => invoices.reduce((sum, inv) => sum + (inv.total ?? 0), 0),
+    [invoices]
+  );
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-6">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-white">Facturas</h1>
+          <h1 className="text-2xl font-semibold text-white">
+            Facturas
+            {!loading && invoices.length > 0 && (
+              <span className="ml-2 text-lg font-medium text-[#E0457B]">
+                ({formatPrice(invoicesTotal)})
+              </span>
+            )}
+          </h1>
           <p className="mt-1 text-sm text-white/50">
             Historial de facturas procesadas
           </p>

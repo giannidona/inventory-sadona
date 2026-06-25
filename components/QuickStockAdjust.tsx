@@ -7,79 +7,98 @@ import { toast } from "sonner";
 type QuickStockAdjustProps = {
   productId: string;
   productName: string;
+  stock: number;
   onUpdated: (newStock: number) => void;
 };
+
+function stockTextColor(stock: number) {
+  if (stock === 0) return "text-red-400";
+  if (stock <= 5) return "text-yellow-400";
+  return "text-green-400";
+}
 
 export default function QuickStockAdjust({
   productId,
   productName,
+  stock,
   onUpdated,
 }: QuickStockAdjustProps) {
-  const [mode, setMode] = useState<"plus" | "minus" | null>(null);
+  const [editing, setEditing] = useState(false);
   const [amount, setAmount] = useState("1");
   const [loading, setLoading] = useState(false);
 
-  async function handleConfirm(delta: number) {
-    const qty = Math.abs(parseInt(amount, 10) || 1);
+  async function adjust(delta: number) {
+    const qty = editing ? Math.abs(parseInt(amount, 10) || 1) : 1;
+    const actualDelta = delta > 0 ? qty : -qty;
+
     setLoading(true);
-
-    const result = await updateStock(productId, delta > 0 ? qty : -qty, "ajuste manual");
-
+    const result = await updateStock(
+      productId,
+      actualDelta,
+      editing ? "ajuste manual" : "ajuste rápido"
+    );
     setLoading(false);
 
     if (result.success && result.data) {
-      toast.success(`${productName}: stock ${result.data.stock}`);
       onUpdated(result.data.stock);
-      setMode(null);
-      setAmount("1");
+      if (editing) {
+        toast.success(`${productName}: stock ${result.data.stock}`);
+        setEditing(false);
+        setAmount("1");
+      }
     } else if (!result.success) {
       toast.error(result.error);
     }
   }
 
-  function handleKeyDown(e: React.KeyboardEvent, delta: number) {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      handleConfirm(delta);
-    }
-    if (e.key === "Escape") {
-      setMode(null);
-      setAmount("1");
-    }
+  function cancelEdit() {
+    setEditing(false);
+    setAmount("1");
   }
 
-  if (mode) {
-    const isPlus = mode === "plus";
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      adjust(1);
+    }
+    if (e.key === "Escape") cancelEdit();
+  }
+
+  if (editing) {
     return (
-      <div className="flex items-center gap-1">
+      <div className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 p-0.5">
+        <button
+          type="button"
+          disabled={loading}
+          onClick={() => adjust(-1)}
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-sm font-bold text-red-400 transition-colors hover:bg-red-500/15 disabled:opacity-50"
+          title="Quitar cantidad"
+        >
+          −
+        </button>
         <input
           type="number"
           min="1"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
-          onKeyDown={(e) => handleKeyDown(e, isPlus ? 1 : -1)}
+          onKeyDown={handleKeyDown}
           autoFocus
-          className="w-14 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-center text-sm text-white outline-none focus:border-[#E0457B]/50"
+          className="w-12 rounded-md border border-white/10 bg-white/5 px-1 py-1 text-center text-sm font-semibold text-white outline-none focus:border-[#E0457B]/50"
         />
         <button
           type="button"
           disabled={loading}
-          onClick={() => handleConfirm(isPlus ? 1 : -1)}
-          className={`rounded-lg px-2 py-1 text-xs font-semibold text-white transition-colors disabled:opacity-50 ${
-            isPlus
-              ? "bg-green-500/80 hover:bg-green-500"
-              : "bg-red-500/80 hover:bg-red-500"
-          }`}
+          onClick={() => adjust(1)}
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-sm font-bold text-green-400 transition-colors hover:bg-green-500/15 disabled:opacity-50"
+          title="Agregar cantidad"
         >
-          ✓
+          +
         </button>
         <button
           type="button"
-          onClick={() => {
-            setMode(null);
-            setAmount("1");
-          }}
-          className="rounded-lg px-1.5 py-1 text-xs text-white/50 hover:text-white"
+          onClick={cancelEdit}
+          className="flex h-8 w-6 shrink-0 items-center justify-center text-xs text-white/40 hover:text-white"
+          title="Cancelar"
         >
           ✕
         </button>
@@ -88,20 +107,31 @@ export default function QuickStockAdjust({
   }
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="inline-flex items-center rounded-lg border border-white/10 bg-white/5 p-0.5">
       <button
         type="button"
-        onClick={() => setMode("minus")}
-        className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-sm font-bold text-white/70 transition-colors hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-400"
-        title="Descontar stock"
+        disabled={loading || stock === 0}
+        onClick={() => adjust(-1)}
+        className="flex h-8 w-8 items-center justify-center rounded-md text-sm font-bold text-white/60 transition-colors hover:bg-red-500/15 hover:text-red-400 disabled:opacity-30"
+        title="Quitar 1"
       >
         −
       </button>
       <button
         type="button"
-        onClick={() => setMode("plus")}
-        className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-sm font-bold text-white/70 transition-colors hover:border-green-500/30 hover:bg-green-500/10 hover:text-green-400"
-        title="Agregar stock"
+        disabled={loading}
+        onClick={() => setEditing(true)}
+        className={`min-w-[2.25rem] px-1.5 py-1 text-sm font-bold tabular-nums transition-colors hover:bg-white/5 ${stockTextColor(stock)}`}
+        title="Clic para ajustar cantidad"
+      >
+        {loading ? "…" : stock}
+      </button>
+      <button
+        type="button"
+        disabled={loading}
+        onClick={() => adjust(1)}
+        className="flex h-8 w-8 items-center justify-center rounded-md text-sm font-bold text-white/60 transition-colors hover:bg-green-500/15 hover:text-green-400 disabled:opacity-50"
+        title="Agregar 1"
       >
         +
       </button>

@@ -6,7 +6,6 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import EditProductModal from "@/components/EditProductModal";
 import MovementsModal from "@/components/MovementsModal";
 import QuickStockAdjust from "@/components/QuickStockAdjust";
-import StockBadge from "@/components/StockBadge";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { formatPrice } from "@/lib/invoice-utils";
 import type { InventoryItem } from "@/lib/types";
@@ -91,13 +90,28 @@ export default function InventoryDashboard() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6">
-      <div className="mb-6">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-2">
+          <h1 className="text-lg font-semibold text-white">Inventario</h1>
+          {!loading && (
+            <span
+              className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#E0457B]/20 px-1.5 text-[11px] font-bold tabular-nums text-[#E0457B]"
+              title={
+                search.trim()
+                  ? `${filtered.length} de ${items.length} productos`
+                  : `${items.length} productos`
+              }
+            >
+              {search.trim() ? filtered.length : items.length}
+            </span>
+          )}
+        </div>
         <input
           type="search"
           placeholder="Buscar por nombre, SKU o EAN..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="input w-full max-w-md"
+          className="input w-full sm:max-w-md"
         />
       </div>
 
@@ -137,7 +151,12 @@ export default function InventoryDashboard() {
                       {item.ean ?? "—"}
                     </td>
                     <td className="px-4 py-3">
-                      <StockBadge stock={item.stock} />
+                      <QuickStockAdjust
+                        productId={item.id}
+                        productName={item.name}
+                        stock={item.stock}
+                        onUpdated={(stock) => updateLocalStock(item.id, stock)}
+                      />
                     </td>
                     <td className="px-4 py-3 text-white/70">
                       {formatPrice(item.unit_price)}
@@ -147,8 +166,6 @@ export default function InventoryDashboard() {
                     </td>
                     <td className="px-4 py-3">
                       <RowActions
-                        item={item}
-                        onStockUpdated={(stock) => updateLocalStock(item.id, stock)}
                         onEdit={() => setEditProduct(item)}
                         onHistory={() => setHistoryProduct(item)}
                         onDelete={() => setDeleteTarget(item)}
@@ -178,12 +195,12 @@ export default function InventoryDashboard() {
                       {formatPrice(item.unit_price)}
                     </p>
                   </div>
-                  <StockBadge stock={item.stock} />
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <QuickStockAdjust
                     productId={item.id}
                     productName={item.name}
+                    stock={item.stock}
                     onUpdated={(stock) => updateLocalStock(item.id, stock)}
                   />
                   <button
@@ -237,25 +254,16 @@ export default function InventoryDashboard() {
 }
 
 function RowActions({
-  item,
-  onStockUpdated,
   onEdit,
   onHistory,
   onDelete,
 }: {
-  item: InventoryItem;
-  onStockUpdated: (stock: number) => void;
   onEdit: () => void;
   onHistory: () => void;
   onDelete: () => void;
 }) {
   return (
     <div className="flex items-center gap-2">
-      <QuickStockAdjust
-        productId={item.id}
-        productName={item.name}
-        onUpdated={onStockUpdated}
-      />
       <button
         type="button"
         onClick={onHistory}

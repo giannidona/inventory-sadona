@@ -14,6 +14,7 @@ function AddProductForm({ prefillEan }: { prefillEan: string }) {
   const [ean, setEan] = useState(prefillEan);
   const [stock, setStock] = useState("0");
   const [marca, setMarca] = useState("");
+  const [unitPrice, setUnitPrice] = useState("");
   const [saving, setSaving] = useState(false);
   const [skuStatus, setSkuStatus] = useState<"idle" | "checking" | "available" | "taken">("idle");
 
@@ -53,6 +54,7 @@ function AddProductForm({ prefillEan }: { prefillEan: string }) {
       ean: ean.trim() || undefined,
       stock: parseInt(stock, 10) || 0,
       marca: marca.trim() || undefined,
+      unit_price: unitPrice ? parseFloat(unitPrice) : undefined,
     });
     setSaving(false);
 
@@ -123,6 +125,18 @@ function AddProductForm({ prefillEan }: { prefillEan: string }) {
             onChange={(e) => setMarca(e.target.value)}
             className="input"
             placeholder="Ej: SADONA, L'Oréal..."
+          />
+        </Field>
+
+        <Field label="Precio unitario">
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={unitPrice}
+            onChange={(e) => setUnitPrice(e.target.value)}
+            className="input"
+            placeholder="0.00"
           />
         </Field>
 

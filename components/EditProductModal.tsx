@@ -56,6 +56,9 @@ function EditProductForm({
   const [sku, setSku] = useState(product.sku);
   const [ean, setEan] = useState(product.ean ?? "");
   const [marca, setMarca] = useState(product.marca ?? "");
+  const [unitPrice, setUnitPrice] = useState(
+    product.unit_price != null ? String(product.unit_price) : ""
+  );
   const [saving, setSaving] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -67,6 +70,7 @@ function EditProductForm({
       sku,
       ean: ean || undefined,
       marca: marca || undefined,
+      unit_price: unitPrice ? parseFloat(unitPrice) : undefined,
     });
 
     setSaving(false);
@@ -110,6 +114,17 @@ function EditProductForm({
           value={marca}
           onChange={(e) => setMarca(e.target.value)}
           className="input"
+        />
+      </Field>
+      <Field label="Precio unitario">
+        <input
+          type="number"
+          min="0"
+          step="0.01"
+          value={unitPrice}
+          onChange={(e) => setUnitPrice(e.target.value)}
+          className="input"
+          placeholder="0.00"
         />
       </Field>
 

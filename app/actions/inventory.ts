@@ -22,6 +22,7 @@ export async function addProduct(
       ean: data.ean || null,
       stock: initialStock,
       marca: data.marca || null,
+      unit_price: data.unit_price ?? null,
     })
     .select("id")
     .single();
@@ -103,6 +104,7 @@ export async function updateProduct(
       sku: data.sku,
       ean: data.ean || null,
       marca: data.marca || null,
+      unit_price: data.unit_price ?? null,
       updated_at: new Date().toISOString(),
     })
     .eq("id", id);

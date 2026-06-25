@@ -26,6 +26,7 @@ export default function Nav() {
 
   const tabs = [
     { href: "/", label: "Inventario" },
+    { href: "/invoices", label: "Facturas" },
     { href: "/add", label: "Agregar" },
   ];
 
@@ -41,7 +42,11 @@ export default function Nav() {
 
         <div className="flex items-center gap-1 sm:gap-2">
           {tabs.map((tab) => {
-            const active = pathname === tab.href;
+            const active =
+              tab.href === "/"
+                ? pathname === "/"
+                : pathname === tab.href ||
+                  pathname.startsWith(`${tab.href}/`);
             return (
               <Link
                 key={tab.href}

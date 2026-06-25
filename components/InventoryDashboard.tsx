@@ -8,6 +8,7 @@ import MovementsModal from "@/components/MovementsModal";
 import QuickStockAdjust from "@/components/QuickStockAdjust";
 import StockBadge from "@/components/StockBadge";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { formatPrice } from "@/lib/invoice-utils";
 import type { InventoryItem } from "@/lib/types";
 import { toast } from "sonner";
 
@@ -119,6 +120,7 @@ export default function InventoryDashboard() {
                   <th className="px-4 py-3 font-medium">SKU</th>
                   <th className="px-4 py-3 font-medium">EAN</th>
                   <th className="px-4 py-3 font-medium">Stock</th>
+                  <th className="px-4 py-3 font-medium">Precio</th>
                   <th className="px-4 py-3 font-medium">Marca</th>
                   <th className="px-4 py-3 font-medium">Acciones</th>
                 </tr>
@@ -136,6 +138,9 @@ export default function InventoryDashboard() {
                     </td>
                     <td className="px-4 py-3">
                       <StockBadge stock={item.stock} />
+                    </td>
+                    <td className="px-4 py-3 text-white/70">
+                      {formatPrice(item.unit_price)}
                     </td>
                     <td className="px-4 py-3 text-white/60">
                       {item.marca ?? "—"}
@@ -169,6 +174,9 @@ export default function InventoryDashboard() {
                     {item.marca && (
                       <p className="mt-1 text-xs text-white/40">{item.marca}</p>
                     )}
+                    <p className="mt-1 text-xs text-white/50">
+                      {formatPrice(item.unit_price)}
+                    </p>
                   </div>
                   <StockBadge stock={item.stock} />
                 </div>

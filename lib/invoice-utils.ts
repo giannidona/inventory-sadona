@@ -108,6 +108,16 @@ export function normalizeInvoiceLine(line: {
   };
 }
 
+export const IVA_RATE = 0.21;
+
+export function calculateInvestmentWithIva(
+  unitPrice: number | null | undefined,
+  stock: number
+): number | null {
+  if (unitPrice == null) return null;
+  return unitPrice * stock * (1 + IVA_RATE);
+}
+
 export function formatPrice(price: number | null | undefined): string {
   if (price == null) return "—";
   return new Intl.NumberFormat("es-AR", {

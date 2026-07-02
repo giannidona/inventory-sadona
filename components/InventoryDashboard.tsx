@@ -10,7 +10,10 @@ import MovementsModal from "@/components/MovementsModal";
 import QuickStockAdjust from "@/components/QuickStockAdjust";
 import ScanStockModal from "@/components/ScanStockModal";
 import { createBrowserClient } from "@/lib/supabase/client";
-import { formatPrice } from "@/lib/invoice-utils";
+import {
+  calculateInvestmentWithIva,
+  formatPrice,
+} from "@/lib/invoice-utils";
 import type { InventoryItem } from "@/lib/types";
 import { toast } from "sonner";
 
@@ -62,6 +65,16 @@ export default function InventoryDashboard() {
         (item.ean?.toLowerCase().includes(q) ?? false)
     );
   }, [items, search]);
+
+  const totalInvestment = useMemo(
+    () =>
+      items.reduce(
+        (sum, item) =>
+          sum + (calculateInvestmentWithIva(item.unit_price, item.stock) ?? 0),
+        0
+      ),
+    [items]
+  );
 
   function updateLocalStock(id: string, stock: number) {
     setItems((prev) =>
@@ -131,19 +144,30 @@ export default function InventoryDashboard() {
     <div className="mx-auto max-w-6xl px-4 py-6">
       <div className="mb-6 flex flex-col gap-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-2">
-            <h1 className="text-lg font-semibold text-white">Inventario</h1>
-            {!loading && (
-              <span
-                className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#E0457B]/20 px-1.5 text-[11px] font-bold tabular-nums text-[#E0457B]"
-                title={
-                  search.trim()
-                    ? `${filtered.length} de ${items.length} productos`
-                    : `${items.length} productos`
-                }
-              >
-                {search.trim() ? filtered.length : items.length}
-              </span>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg font-semibold text-white">Inventario</h1>
+              {!loading && (
+                <span
+                  className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#E0457B]/20 px-1.5 text-[11px] font-bold tabular-nums text-[#E0457B]"
+                  title={
+                    search.trim()
+                      ? `${filtered.length} de ${items.length} productos`
+                      : `${items.length} productos`
+                  }
+                >
+                  {search.trim() ? filtered.length : items.length}
+                </span>
+              )}
+            </div>
+            {!loading && items.length > 0 && (
+              <p className="mt-1 text-sm text-white/50">
+                Total invertido{" "}
+                <span className="font-medium text-[#E0457B]">
+                  {formatPrice(totalInvestment)}
+                </span>
+                <span className="text-white/40"> (precio × stock + 21% IVA)</span>
+              </p>
             )}
           </div>
           <input
@@ -221,6 +245,7 @@ export default function InventoryDashboard() {
                   <th className="px-4 py-3 font-medium">EAN</th>
                   <th className="px-4 py-3 font-medium">Stock</th>
                   <th className="px-4 py-3 font-medium">Precio</th>
+                  <th className="px-4 py-3 font-medium">Inversión</th>
                   <th className="px-4 py-3 font-medium">Marca</th>
                   <th className="px-4 py-3 font-medium">Acciones</th>
                 </tr>
@@ -246,6 +271,11 @@ export default function InventoryDashboard() {
                     </td>
                     <td className="px-4 py-3 text-white/70">
                       {formatPrice(item.unit_price)}
+                    </td>
+                    <td className="px-4 py-3 font-medium text-[#E0457B]/90">
+                      {formatPrice(
+                        calculateInvestmentWithIva(item.unit_price, item.stock)
+                      )}
                     </td>
                     <td className="px-4 py-3 text-white/60">
                       {item.marca ?? "—"}
@@ -279,6 +309,12 @@ export default function InventoryDashboard() {
                     )}
                     <p className="mt-1 text-xs text-white/50">
                       {formatPrice(item.unit_price)}
+                    </p>
+                    <p className="mt-0.5 text-xs font-medium text-[#E0457B]/90">
+                      Inversión:{" "}
+                      {formatPrice(
+                        calculateInvestmentWithIva(item.unit_price, item.stock)
+                      )}
                     </p>
                   </div>
                 </div>

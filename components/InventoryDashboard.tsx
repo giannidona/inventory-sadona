@@ -17,10 +17,13 @@ import {
 import type { InventoryItem } from "@/lib/types";
 import { toast } from "sonner";
 
+type StockSort = null | "asc" | "desc";
+
 export default function InventoryDashboard() {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [stockSort, setStockSort] = useState<StockSort>(null);
   const [editProduct, setEditProduct] = useState<InventoryItem | null>(null);
   const [historyProduct, setHistoryProduct] = useState<InventoryItem | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<InventoryItem | null>(null);
@@ -57,14 +60,29 @@ export default function InventoryDashboard() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter(
-      (item) =>
-        item.name.toLowerCase().includes(q) ||
-        item.sku.toLowerCase().includes(q) ||
-        (item.ean?.toLowerCase().includes(q) ?? false)
+    const list = !q
+      ? items
+      : items.filter(
+          (item) =>
+            item.name.toLowerCase().includes(q) ||
+            item.sku.toLowerCase().includes(q) ||
+            (item.ean?.toLowerCase().includes(q) ?? false)
+        );
+
+    if (!stockSort) return list;
+
+    return [...list].sort((a, b) => {
+      const diff =
+        stockSort === "desc" ? b.stock - a.stock : a.stock - b.stock;
+      return diff !== 0 ? diff : a.name.localeCompare(b.name);
+    });
+  }, [items, search, stockSort]);
+
+  function cycleStockSort() {
+    setStockSort((prev) =>
+      prev === null ? "desc" : prev === "desc" ? "asc" : null
     );
-  }, [items, search]);
+  }
 
   const totalInvestment = useMemo(
     () =>
@@ -243,7 +261,23 @@ export default function InventoryDashboard() {
                   <th className="px-4 py-3 font-medium">Nombre</th>
                   <th className="px-4 py-3 font-medium">SKU</th>
                   <th className="px-4 py-3 font-medium">EAN</th>
-                  <th className="px-4 py-3 font-medium">Stock</th>
+                  <th className="px-4 py-3 font-medium">
+                    <button
+                      type="button"
+                      onClick={cycleStockSort}
+                      className="inline-flex items-center gap-1 transition-colors hover:text-white"
+                      title={
+                        stockSort === "desc"
+                          ? "Ordenado: mayor a menor stock"
+                          : stockSort === "asc"
+                            ? "Ordenado: menor a mayor stock"
+                            : "Ordenado por nombre (click para ordenar por stock)"
+                      }
+                    >
+                      Stock
+                      <StockSortIcon sort={stockSort} />
+                    </button>
+                  </th>
                   <th className="px-4 py-3 font-medium">Precio</th>
                   <th className="px-4 py-3 font-medium">Inversión</th>
                   <th className="px-4 py-3 font-medium">Marca</th>
@@ -404,6 +438,59 @@ export default function InventoryDashboard() {
         </div>
       )}
     </div>
+  );
+}
+
+function StockSortIcon({ sort }: { sort: StockSort }) {
+  if (sort === "desc") {
+    return (
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="h-3.5 w-3.5 text-[#E0457B]"
+        aria-hidden
+      >
+        <path d="m6 9 6 6 6-6" />
+      </svg>
+    );
+  }
+  if (sort === "asc") {
+    return (
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="h-3.5 w-3.5 text-[#E0457B]"
+        aria-hidden
+      >
+        <path d="m18 15-6-6-6 6" />
+      </svg>
+    );
+  }
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-3.5 w-3.5 opacity-40"
+      aria-hidden
+    >
+      <path d="m7 15 5 5 5-5" />
+      <path d="m7 9 5-5 5 5" />
+    </svg>
   );
 }
 

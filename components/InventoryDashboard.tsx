@@ -19,6 +19,10 @@ import { toast } from "sonner";
 
 type StockSort = null | "asc" | "desc";
 
+function doanProductUrl(sku: string) {
+  return `https://doan.com.ar/index.php?route=product/product&product_id=${encodeURIComponent(sku)}`;
+}
+
 export default function InventoryDashboard() {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -316,6 +320,7 @@ export default function InventoryDashboard() {
                     </td>
                     <td className="px-4 py-3">
                       <RowActions
+                        sku={item.sku}
                         onEdit={() => setEditProduct(item)}
                         onHistory={() => setHistoryProduct(item)}
                         onDelete={() => setDeleteTarget(item)}
@@ -359,6 +364,14 @@ export default function InventoryDashboard() {
                     stock={item.stock}
                     onUpdated={(stock) => updateLocalStock(item.id, stock)}
                   />
+                  <a
+                    href={doanProductUrl(item.sku)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-lg border border-[#E0457B]/30 px-3 py-1.5 text-xs font-medium text-[#E0457B]/90 transition-colors hover:bg-[#E0457B]/10"
+                  >
+                    Ver en Doan
+                  </a>
                   <button
                     type="button"
                     onClick={() => setHistoryProduct(item)}
@@ -513,16 +526,26 @@ function CameraIcon() {
 }
 
 function RowActions({
+  sku,
   onEdit,
   onHistory,
   onDelete,
 }: {
+  sku: string;
   onEdit: () => void;
   onHistory: () => void;
   onDelete: () => void;
 }) {
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
+      <a
+        href={doanProductUrl(sku)}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="rounded-lg border border-[#E0457B]/30 px-2.5 py-1 text-xs font-medium text-[#E0457B]/90 transition-colors hover:bg-[#E0457B]/10"
+      >
+        Ver en Doan
+      </a>
       <button
         type="button"
         onClick={onHistory}

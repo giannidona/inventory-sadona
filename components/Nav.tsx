@@ -16,7 +16,7 @@ export default function Nav() {
 
   return (
     <nav className="sticky top-0 z-50 border-b border-white/10 bg-[#0f0f0f]/80 backdrop-blur-xl">
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
+      <div className="page-container flex items-center justify-between gap-4 px-4 py-3">
         <Link href="/" className="shrink-0">
           <span className="text-lg font-semibold tracking-tight">
             <span className="text-[#E0457B]">SADONA</span>{" "}

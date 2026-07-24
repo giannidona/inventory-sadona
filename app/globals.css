@@ -27,6 +27,12 @@ body {
   .input {
     @apply w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder:text-white/30 outline-none transition-colors focus:border-[#E0457B]/50 focus:ring-1 focus:ring-[#E0457B]/30;
   }
+
+  /* Fluid page width: scales with the viewport instead of a fixed cap,
+     so wide monitors get more room while narrow screens stay full-width. */
+  .page-container {
+    @apply mx-auto w-full max-w-[min(1600px,95vw)];
+  }
 }
 
 dialog::backdrop {

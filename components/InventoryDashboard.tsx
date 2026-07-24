@@ -19,14 +19,11 @@ import {
   loadLowStockThreshold,
   onLowStockThresholdChange,
 } from "@/lib/low-stock";
+import ProductActionIcons from "@/components/ProductActionIcons";
 import type { InventoryItem } from "@/lib/types";
 import { toast } from "sonner";
 
 type StockSort = null | "asc" | "desc";
-
-function doanProductUrl(sku: string) {
-  return `https://doan.com.ar/index.php?route=product/product&product_id=${encodeURIComponent(sku)}`;
-}
 
 export default function InventoryDashboard() {
   const searchParams = useSearchParams();
@@ -188,7 +185,7 @@ export default function InventoryDashboard() {
     cameraActive && !scanProduct && !notFoundEan && !cameraError;
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6">
+    <div className="page-container px-4 py-6">
       <div className="mb-6 flex flex-col gap-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -301,77 +298,79 @@ export default function InventoryDashboard() {
         <>
           {/* Desktop table */}
           <div className="glass-card hidden overflow-hidden md:block">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-white/10 text-left text-white/50">
-                  <th className="px-4 py-3 font-medium">Nombre</th>
-                  <th className="px-4 py-3 font-medium">SKU</th>
-                  <th className="px-4 py-3 font-medium">EAN</th>
-                  <th className="px-4 py-3 font-medium">
-                    <button
-                      type="button"
-                      onClick={cycleStockSort}
-                      className="inline-flex items-center gap-1 transition-colors hover:text-white"
-                      title={
-                        stockSort === "desc"
-                          ? "Ordenado: mayor a menor stock"
-                          : stockSort === "asc"
-                            ? "Ordenado: menor a mayor stock"
-                            : "Ordenado por nombre (click para ordenar por stock)"
-                      }
-                    >
-                      Stock
-                      <StockSortIcon sort={stockSort} />
-                    </button>
-                  </th>
-                  <th className="px-4 py-3 font-medium">Precio</th>
-                  <th className="px-4 py-3 font-medium">Inversión</th>
-                  <th className="px-4 py-3 font-medium">Marca</th>
-                  <th className="px-4 py-3 font-medium">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((item) => (
-                  <tr
-                    key={item.id}
-                    className="border-b border-white/5 transition-colors hover:bg-white/[0.02]"
-                  >
-                    <td className="px-4 py-3 font-medium text-white">{item.name}</td>
-                    <td className="px-4 py-3 font-mono text-white/70">{item.sku}</td>
-                    <td className="px-4 py-3 font-mono text-white/50">
-                      {item.ean ?? "—"}
-                    </td>
-                    <td className="px-4 py-3">
-                      <QuickStockAdjust
-                        productId={item.id}
-                        productName={item.name}
-                        stock={item.stock}
-                        onUpdated={(stock) => updateLocalStock(item.id, stock)}
-                      />
-                    </td>
-                    <td className="px-4 py-3 text-white/70">
-                      {formatPrice(item.unit_price)}
-                    </td>
-                    <td className="px-4 py-3 font-medium text-[#E0457B]/90">
-                      {formatPrice(
-                        calculateInvestmentWithIva(item.unit_price, item.stock)
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-white/60">
-                      {item.marca ?? "—"}
-                    </td>
-                    <td className="px-4 py-3">
-                      <RowActions
-                        sku={item.sku}
-                        onEdit={() => setEditProduct(item)}
-                        onHistory={() => setHistoryProduct(item)}
-                        onDelete={() => setDeleteTarget(item)}
-                      />
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[900px] text-sm">
+                <thead>
+                  <tr className="border-b border-white/10 text-left text-white/50">
+                    <th className="px-4 py-3 font-medium">Nombre</th>
+                    <th className="px-4 py-3 font-medium">SKU</th>
+                    <th className="px-4 py-3 font-medium">EAN</th>
+                    <th className="px-4 py-3 font-medium">
+                      <button
+                        type="button"
+                        onClick={cycleStockSort}
+                        className="inline-flex items-center gap-1 transition-colors hover:text-white"
+                        title={
+                          stockSort === "desc"
+                            ? "Ordenado: mayor a menor stock"
+                            : stockSort === "asc"
+                              ? "Ordenado: menor a mayor stock"
+                              : "Ordenado por nombre (click para ordenar por stock)"
+                        }
+                      >
+                        Stock
+                        <StockSortIcon sort={stockSort} />
+                      </button>
+                    </th>
+                    <th className="px-4 py-3 font-medium">Precio</th>
+                    <th className="px-4 py-3 font-medium">Inversión</th>
+                    <th className="px-4 py-3 font-medium">Marca</th>
+                    <th className="px-4 py-3 font-medium">Acciones</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {filtered.map((item) => (
+                    <tr
+                      key={item.id}
+                      className="border-b border-white/5 transition-colors hover:bg-white/[0.02]"
+                    >
+                      <td className="px-4 py-3 font-medium text-white">{item.name}</td>
+                      <td className="px-4 py-3 font-mono text-white/70">{item.sku}</td>
+                      <td className="px-4 py-3 font-mono text-white/50">
+                        {item.ean ?? "—"}
+                      </td>
+                      <td className="px-4 py-3">
+                        <QuickStockAdjust
+                          productId={item.id}
+                          productName={item.name}
+                          stock={item.stock}
+                          onUpdated={(stock) => updateLocalStock(item.id, stock)}
+                        />
+                      </td>
+                      <td className="px-4 py-3 text-white/70">
+                        {formatPrice(item.unit_price)}
+                      </td>
+                      <td className="px-4 py-3 font-medium text-[#E0457B]/90">
+                        {formatPrice(
+                          calculateInvestmentWithIva(item.unit_price, item.stock)
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-white/60">
+                        {item.marca ?? "—"}
+                      </td>
+                      <td className="px-4 py-3">
+                        <ProductActionIcons
+                          sku={item.sku}
+                          onEdit={() => setEditProduct(item)}
+                          onHistory={() => setHistoryProduct(item)}
+                          onDelete={() => setDeleteTarget(item)}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           {/* Mobile cards */}
@@ -406,35 +405,12 @@ export default function InventoryDashboard() {
                     stock={item.stock}
                     onUpdated={(stock) => updateLocalStock(item.id, stock)}
                   />
-                  <a
-                    href={doanProductUrl(item.sku)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="rounded-lg border border-[#E0457B]/30 px-3 py-1.5 text-xs font-medium text-[#E0457B]/90 transition-colors hover:bg-[#E0457B]/10"
-                  >
-                    Ver en Doan
-                  </a>
-                  <button
-                    type="button"
-                    onClick={() => setHistoryProduct(item)}
-                    className="rounded-lg border border-white/10 px-3 py-1.5 text-xs font-medium text-white/60 transition-colors hover:bg-white/5"
-                  >
-                    Historial
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setEditProduct(item)}
-                    className="rounded-lg border border-white/10 px-3 py-1.5 text-xs font-medium text-white/60 transition-colors hover:bg-white/5"
-                  >
-                    Editar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setDeleteTarget(item)}
-                    className="rounded-lg border border-red-500/20 px-3 py-1.5 text-xs font-medium text-red-400/80 transition-colors hover:bg-red-500/10"
-                  >
-                    Eliminar
-                  </button>
+                  <ProductActionIcons
+                    sku={item.sku}
+                    onEdit={() => setEditProduct(item)}
+                    onHistory={() => setHistoryProduct(item)}
+                    onDelete={() => setDeleteTarget(item)}
+                  />
                 </div>
               </div>
             ))}
@@ -587,48 +563,3 @@ function CameraIcon() {
   );
 }
 
-function RowActions({
-  sku,
-  onEdit,
-  onHistory,
-  onDelete,
-}: {
-  sku: string;
-  onEdit: () => void;
-  onHistory: () => void;
-  onDelete: () => void;
-}) {
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      <a
-        href={doanProductUrl(sku)}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="rounded-lg border border-[#E0457B]/30 px-2.5 py-1 text-xs font-medium text-[#E0457B]/90 transition-colors hover:bg-[#E0457B]/10"
-      >
-        Ver en Doan
-      </a>
-      <button
-        type="button"
-        onClick={onHistory}
-        className="rounded-lg border border-white/10 px-2.5 py-1 text-xs font-medium text-white/60 transition-colors hover:bg-white/5"
-      >
-        Ver historial
-      </button>
-      <button
-        type="button"
-        onClick={onEdit}
-        className="rounded-lg border border-white/10 px-2.5 py-1 text-xs font-medium text-white/60 transition-colors hover:bg-white/5"
-      >
-        Editar
-      </button>
-      <button
-        type="button"
-        onClick={onDelete}
-        className="rounded-lg border border-red-500/20 px-2.5 py-1 text-xs font-medium text-red-400/80 transition-colors hover:bg-red-500/10"
-      >
-        Eliminar
-      </button>
-    </div>
-  );
-}

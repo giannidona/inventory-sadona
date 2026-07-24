@@ -58,7 +58,7 @@ export default function InvoicesPage() {
   );
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6">
+    <div className="page-container px-4 py-6">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-white">
@@ -98,60 +98,62 @@ export default function InvoicesPage() {
       ) : (
         <>
           <div className="glass-card hidden overflow-hidden md:block">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-white/10 text-left text-white/50">
-                  <th className="px-4 py-3 font-medium">Número</th>
-                  <th className="px-4 py-3 font-medium">Proveedor</th>
-                  <th className="px-4 py-3 font-medium">Total</th>
-                  <th className="px-4 py-3 font-medium">Fecha</th>
-                  <th className="px-4 py-3 font-medium">Archivo</th>
-                  <th className="px-4 py-3 font-medium">Detalle</th>
-                </tr>
-              </thead>
-              <tbody>
-                {invoices.map((inv) => (
-                  <tr
-                    key={inv.id}
-                    className="border-b border-white/5 transition-colors hover:bg-white/[0.02]"
-                  >
-                    <td className="px-4 py-3 font-medium text-white">
-                      {inv.invoice_number}
-                    </td>
-                    <td className="px-4 py-3 text-white/60">
-                      {inv.supplier ?? "—"}
-                    </td>
-                    <td className="px-4 py-3 text-white/70">
-                      {formatPrice(inv.total)}
-                    </td>
-                    <td className="px-4 py-3 text-white/50">
-                      {new Date(inv.created_at).toLocaleDateString("es-AR")}
-                    </td>
-                    <td className="px-4 py-3">
-                      {inv.file_name ? (
-                        <button
-                          type="button"
-                          onClick={() => handleDownload(inv)}
-                          className="text-xs font-medium text-[#E0457B] hover:underline"
-                        >
-                          {inv.file_name}
-                        </button>
-                      ) : (
-                        <span className="text-white/30">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <Link
-                        href={`/invoices/${inv.id}`}
-                        className="text-xs font-medium text-white/60 hover:text-white"
-                      >
-                        Ver detalle
-                      </Link>
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[700px] text-sm">
+                <thead>
+                  <tr className="border-b border-white/10 text-left text-white/50">
+                    <th className="px-4 py-3 font-medium">Número</th>
+                    <th className="px-4 py-3 font-medium">Proveedor</th>
+                    <th className="px-4 py-3 font-medium">Total</th>
+                    <th className="px-4 py-3 font-medium">Fecha</th>
+                    <th className="px-4 py-3 font-medium">Archivo</th>
+                    <th className="px-4 py-3 font-medium">Detalle</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {invoices.map((inv) => (
+                    <tr
+                      key={inv.id}
+                      className="border-b border-white/5 transition-colors hover:bg-white/[0.02]"
+                    >
+                      <td className="px-4 py-3 font-medium text-white">
+                        {inv.invoice_number}
+                      </td>
+                      <td className="px-4 py-3 text-white/60">
+                        {inv.supplier ?? "—"}
+                      </td>
+                      <td className="px-4 py-3 text-white/70">
+                        {formatPrice(inv.total)}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-white/50">
+                        {new Date(inv.created_at).toLocaleDateString("es-AR")}
+                      </td>
+                      <td className="px-4 py-3">
+                        {inv.file_name ? (
+                          <button
+                            type="button"
+                            onClick={() => handleDownload(inv)}
+                            className="text-xs font-medium text-[#E0457B] hover:underline"
+                          >
+                            {inv.file_name}
+                          </button>
+                        ) : (
+                          <span className="text-white/30">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <Link
+                          href={`/invoices/${inv.id}`}
+                          className="text-xs font-medium text-white/60 hover:text-white"
+                        >
+                          Ver detalle
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           <div className="space-y-3 md:hidden">

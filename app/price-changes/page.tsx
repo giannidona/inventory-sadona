@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { getPriceChanges } from "@/app/actions/price-changes";
 import { formatPrice } from "@/lib/invoice-utils";
+import { mercadoLibreSearchUrl } from "@/lib/marketplace-links";
+import { ShoppingBagIcon } from "@/components/icons";
 import type { PriceChange } from "@/lib/types";
 import { toast } from "sonner";
 
@@ -35,7 +37,7 @@ export default function PriceChangesPage() {
   }, []);
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-6">
+    <div className="page-container px-4 py-6">
       <div className="mb-6">
         <div className="flex items-center gap-2">
           <h1 className="text-2xl font-semibold text-white">
@@ -71,58 +73,77 @@ export default function PriceChangesPage() {
         <>
           {/* Desktop table */}
           <div className="glass-card hidden overflow-hidden md:block">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-white/10 text-left text-white/50">
-                  <th className="px-4 py-3 font-medium">Producto</th>
-                  <th className="px-4 py-3 font-medium">SKU</th>
-                  <th className="px-4 py-3 font-medium">Precio anterior</th>
-                  <th className="px-4 py-3 font-medium">Precio nuevo</th>
-                  <th className="px-4 py-3 font-medium">Variación</th>
-                  <th className="px-4 py-3 font-medium">Factura</th>
-                  <th className="px-4 py-3 font-medium">Fecha</th>
-                </tr>
-              </thead>
-              <tbody>
-                {changes.map((change) => (
-                  <tr
-                    key={change.id}
-                    className="border-b border-white/5 transition-colors hover:bg-white/[0.02]"
-                  >
-                    <td className="px-4 py-3 font-medium text-white">
-                      {change.product_name}
-                    </td>
-                    <td className="px-4 py-3 font-mono text-white/50">
-                      {change.sku ?? "—"}
-                    </td>
-                    <td className="px-4 py-3 text-white/50 line-through decoration-white/30">
-                      {formatPrice(change.old_price)}
-                    </td>
-                    <td className="px-4 py-3 font-medium text-white">
-                      {formatPrice(change.new_price)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <PriceDelta oldPrice={change.old_price} newPrice={change.new_price} />
-                    </td>
-                    <td className="px-4 py-3">
-                      {change.invoice_id ? (
-                        <Link
-                          href={`/invoices/${change.invoice_id}`}
-                          className="text-xs font-medium text-[#E0457B] hover:underline"
-                        >
-                          {change.invoices?.invoice_number ?? "Ver factura"}
-                        </Link>
-                      ) : (
-                        <span className="text-white/30">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-white/50">
-                      {new Date(change.created_at).toLocaleDateString("es-AR")}
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[900px] text-sm">
+                <thead>
+                  <tr className="border-b border-white/10 text-left text-white/50">
+                    <th className="px-4 py-3 font-medium">Producto</th>
+                    <th className="px-4 py-3 font-medium">SKU</th>
+                    <th className="px-4 py-3 font-medium">Precio anterior</th>
+                    <th className="px-4 py-3 font-medium">Precio nuevo</th>
+                    <th className="px-4 py-3 font-medium">Variación</th>
+                    <th className="px-4 py-3 font-medium">Factura</th>
+                    <th className="px-4 py-3 font-medium">Fecha</th>
+                    <th className="px-4 py-3 font-medium">ML</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {changes.map((change) => (
+                    <tr
+                      key={change.id}
+                      className="border-b border-white/5 transition-colors hover:bg-white/[0.02]"
+                    >
+                      <td className="px-4 py-3 font-medium text-white">
+                        {change.product_name}
+                      </td>
+                      <td className="px-4 py-3 font-mono text-white/50">
+                        {change.sku ?? "—"}
+                      </td>
+                      <td className="px-4 py-3 text-white/50 line-through decoration-white/30">
+                        {formatPrice(change.old_price)}
+                      </td>
+                      <td className="px-4 py-3 font-medium text-white">
+                        {formatPrice(change.new_price)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <PriceDelta oldPrice={change.old_price} newPrice={change.new_price} />
+                      </td>
+                      <td className="px-4 py-3">
+                        {change.invoice_id ? (
+                          <Link
+                            href={`/invoices/${change.invoice_id}`}
+                            className="text-xs font-medium text-[#E0457B] hover:underline"
+                          >
+                            {change.invoices?.invoice_number ?? "Ver factura"}
+                          </Link>
+                        ) : (
+                          <span className="text-white/30">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-white/50">
+                        {new Date(change.created_at).toLocaleDateString("es-AR")}
+                      </td>
+                      <td className="px-4 py-3">
+                        {change.sku ? (
+                          <a
+                            href={mercadoLibreSearchUrl(change.sku)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="Ver en MercadoLibre"
+                            aria-label="Ver en MercadoLibre"
+                            className="flex h-9 w-9 items-center justify-center rounded-lg border border-yellow-400/30 text-yellow-400/90 transition-colors hover:bg-yellow-400/10"
+                          >
+                            <ShoppingBagIcon />
+                          </a>
+                        ) : (
+                          <span className="text-white/30">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           {/* Mobile cards */}
@@ -130,13 +151,27 @@ export default function PriceChangesPage() {
             {changes.map((change) => (
               <div key={change.id} className="glass-card p-4">
                 <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <h3 className="truncate font-semibold text-white">
                       {change.product_name}
                     </h3>
-                    <p className="mt-0.5 font-mono text-xs text-white/50">
-                      {change.sku ?? "—"}
-                    </p>
+                    <div className="mt-0.5 flex items-center gap-2">
+                      <p className="font-mono text-xs text-white/50">
+                        {change.sku ?? "—"}
+                      </p>
+                      {change.sku && (
+                        <a
+                          href={mercadoLibreSearchUrl(change.sku)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Ver en MercadoLibre"
+                          aria-label="Ver en MercadoLibre"
+                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-yellow-400/30 text-yellow-400/90 transition-colors hover:bg-yellow-400/10"
+                        >
+                          <ShoppingBagIcon />
+                        </a>
+                      )}
+                    </div>
                   </div>
                   <PriceDelta oldPrice={change.old_price} newPrice={change.new_price} />
                 </div>

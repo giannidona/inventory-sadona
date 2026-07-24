@@ -88,9 +88,23 @@ export type ProcessInvoiceResult = {
   invoice_id: string;
   created: number;
   updated: number;
+  price_changes: number;
   items: Array<{
     product_name: string;
     action: "created" | "updated";
     new_stock: number;
+    price_change?: { old_price: number; new_price: number };
   }>;
+};
+
+export type PriceChange = {
+  id: string;
+  invoice_id: string | null;
+  inventory_id: string | null;
+  product_name: string;
+  sku: string | null;
+  old_price: number;
+  new_price: number;
+  created_at: string;
+  invoices?: { invoice_number: string } | null;
 };

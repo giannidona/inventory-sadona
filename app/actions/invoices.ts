@@ -20,7 +20,7 @@ async function findProduct(
   if (line.sku?.trim()) {
     const { data } = await supabase
       .from("inventory")
-      .select("id, stock, name, sku")
+      .select("id, stock, name, sku, unit_price")
       .eq("sku", line.sku.trim())
       .maybeSingle();
     if (data) return data;
@@ -29,7 +29,7 @@ async function findProduct(
   if (line.ean?.trim()) {
     const { data } = await supabase
       .from("inventory")
-      .select("id, stock, name, sku")
+      .select("id, stock, name, sku, unit_price")
       .eq("ean", line.ean.trim())
       .maybeSingle();
     if (data) return data;
@@ -37,7 +37,7 @@ async function findProduct(
 
   const { data } = await supabase
     .from("inventory")
-    .select("id, stock, name, sku")
+    .select("id, stock, name, sku, unit_price")
     .ilike("name", line.name.trim())
     .maybeSingle();
 
@@ -134,12 +134,14 @@ export async function processInvoice(
   const results: ProcessInvoiceResult["items"] = [];
   let created = 0;
   let updated = 0;
+  let priceChanges = 0;
 
   for (const line of input.lines) {
     if (!line.name.trim() || line.quantity <= 0) continue;
 
     let product = await findProduct(supabase, line);
     let action: "created" | "updated";
+    let priceChangeInfo: { old_price: number; new_price: number } | undefined;
 
     if (!product) {
       const sku = line.sku?.trim() || generateSku(line.name);
@@ -153,7 +155,7 @@ export async function processInvoice(
           stock: line.quantity,
           unit_price: line.unit_price ?? null,
         })
-        .select("id, stock, name, sku")
+        .select("id, stock, name, sku, unit_price")
         .single();
 
       if (createError || !newProduct) {
@@ -178,6 +180,13 @@ export async function processInvoice(
         stock: newStock,
         updated_at: new Date().toISOString(),
       };
+
+      const oldPrice = product.unit_price;
+      const priceChanged =
+        line.unit_price != null &&
+        oldPrice != null &&
+        Math.round(line.unit_price * 100) !== Math.round(oldPrice * 100);
+
       if (line.unit_price != null) {
         updateData.unit_price = line.unit_price;
       }
@@ -200,7 +209,24 @@ export async function processInvoice(
         reason,
       });
 
-      product = { ...product, stock: newStock };
+      if (priceChanged && line.unit_price != null && oldPrice != null) {
+        await supabase.from("price_changes").insert({
+          invoice_id: invoice.id,
+          inventory_id: product.id,
+          product_name: line.name.trim(),
+          sku: product.sku,
+          old_price: oldPrice,
+          new_price: line.unit_price,
+        });
+        priceChanges++;
+        priceChangeInfo = { old_price: oldPrice, new_price: line.unit_price };
+      }
+
+      product = {
+        ...product,
+        stock: newStock,
+        unit_price: line.unit_price ?? product.unit_price,
+      };
       action = "updated";
       updated++;
     }
@@ -218,12 +244,14 @@ export async function processInvoice(
       product_name: line.name.trim(),
       action,
       new_stock: product.stock,
+      price_change: priceChangeInfo,
     });
   }
 
   revalidatePath("/");
   revalidatePath("/invoices");
   revalidatePath("/scan");
+  revalidatePath("/price-changes");
 
   return {
     success: true,
@@ -231,6 +259,7 @@ export async function processInvoice(
       invoice_id: invoice.id,
       created,
       updated,
+      price_changes: priceChanges,
       items: results,
     },
   };

@@ -105,10 +105,23 @@ export default function InvoiceUploadForm() {
     setSaving(false);
 
     if (result.success && result.data) {
-      const { created, updated } = result.data;
+      const { created, updated, price_changes } = result.data;
       toast.success(
         `Factura guardada: ${created} creado${created !== 1 ? "s" : ""}, ${updated} actualizado${updated !== 1 ? "s" : ""}`
       );
+
+      if (price_changes > 0) {
+        toast.warning(
+          `${price_changes} producto${price_changes !== 1 ? "s" : ""} con precio distinto al que tenías`,
+          {
+            action: {
+              label: "Ver cambios",
+              onClick: () => router.push("/price-changes"),
+            },
+          }
+        );
+      }
+
       setReviewOpen(false);
       router.push("/invoices");
     } else if (!result.success) {

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { deleteProduct } from "@/app/actions/inventory";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -14,6 +15,10 @@ import {
   calculateInvestmentWithIva,
   formatPrice,
 } from "@/lib/invoice-utils";
+import {
+  loadLowStockThreshold,
+  onLowStockThresholdChange,
+} from "@/lib/low-stock";
 import type { InventoryItem } from "@/lib/types";
 import { toast } from "sonner";
 
@@ -24,10 +29,17 @@ function doanProductUrl(sku: string) {
 }
 
 export default function InventoryDashboard() {
+  const searchParams = useSearchParams();
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [stockSort, setStockSort] = useState<StockSort>(null);
+  const [lowStockThreshold, setLowStockThreshold] = useState<number>(
+    () => loadLowStockThreshold()
+  );
+  const [lowStockOnly, setLowStockOnly] = useState(
+    () => searchParams.get("low") === "1"
+  );
   const [editProduct, setEditProduct] = useState<InventoryItem | null>(null);
   const [historyProduct, setHistoryProduct] = useState<InventoryItem | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<InventoryItem | null>(null);
@@ -62,9 +74,13 @@ export default function InventoryDashboard() {
     };
   }, []);
 
+  useEffect(() => {
+    return onLowStockThresholdChange(setLowStockThreshold);
+  }, []);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const list = !q
+    let list = !q
       ? items
       : items.filter(
           (item) =>
@@ -73,6 +89,10 @@ export default function InventoryDashboard() {
             (item.ean?.toLowerCase().includes(q) ?? false)
         );
 
+    if (lowStockOnly) {
+      list = list.filter((item) => item.stock <= lowStockThreshold);
+    }
+
     if (!stockSort) return list;
 
     return [...list].sort((a, b) => {
@@ -80,7 +100,12 @@ export default function InventoryDashboard() {
         stockSort === "desc" ? b.stock - a.stock : a.stock - b.stock;
       return diff !== 0 ? diff : a.name.localeCompare(b.name);
     });
-  }, [items, search, stockSort]);
+  }, [items, search, stockSort, lowStockOnly, lowStockThreshold]);
+
+  const lowStockCount = useMemo(
+    () => items.filter((item) => item.stock <= lowStockThreshold).length,
+    [items, lowStockThreshold]
+  );
 
   function cycleStockSort() {
     setStockSort((prev) =>
@@ -192,13 +217,30 @@ export default function InventoryDashboard() {
               </p>
             )}
           </div>
-          <input
-            type="search"
-            placeholder="Buscar por nombre, SKU o EAN..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="input w-full sm:max-w-md"
-          />
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <input
+              type="search"
+              placeholder="Buscar por nombre, SKU o EAN..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="input w-full sm:max-w-md"
+            />
+            {lowStockCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setLowStockOnly((v) => !v)}
+                className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl border px-3 py-2.5 text-xs font-semibold transition-colors sm:py-2 ${
+                  lowStockOnly
+                    ? "border-yellow-400/40 bg-yellow-400/10 text-yellow-400"
+                    : "border-white/10 text-white/60 hover:bg-white/5"
+                }`}
+                title="Filtrar productos con stock bajo"
+              >
+                <WarningIcon />
+                Stock bajo ({lowStockCount})
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="flex flex-col gap-3">
@@ -503,6 +545,26 @@ function StockSortIcon({ sort }: { sort: StockSort }) {
     >
       <path d="m7 15 5 5 5-5" />
       <path d="m7 9 5-5 5 5" />
+    </svg>
+  );
+}
+
+function WarningIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-3.5 w-3.5"
+      aria-hidden
+    >
+      <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+      <path d="M12 9v4" />
+      <path d="M12 17h.01" />
     </svg>
   );
 }

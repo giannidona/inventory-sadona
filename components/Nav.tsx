@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import LowStockBell from "@/components/LowStockBell";
 
 export default function Nav() {
   const pathname = usePathname();
@@ -43,6 +44,7 @@ export default function Nav() {
               </Link>
             );
           })}
+          <LowStockBell />
         </div>
       </div>
     </nav>

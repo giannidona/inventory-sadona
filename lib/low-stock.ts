@@ -48,6 +48,7 @@ export function onLowStockThresholdChange(
 export type DismissedLowStockMap = Record<string, number>;
 
 const DISMISSED_KEY = "sadona:dismissedLowStock";
+const DISMISSED_EVENT = "sadona:low-stock-dismissed-changed";
 
 export function loadDismissedLowStock(): DismissedLowStockMap {
   if (typeof window === "undefined") return {};
@@ -62,7 +63,14 @@ export function loadDismissedLowStock(): DismissedLowStockMap {
 export function saveDismissedLowStock(map: DismissedLowStockMap): void {
   try {
     window.localStorage.setItem(DISMISSED_KEY, JSON.stringify(map));
+    window.dispatchEvent(new Event(DISMISSED_EVENT));
   } catch {
     // ignore storage errors (private mode, quota, etc.)
   }
+}
+
+/** Notifies other components in the same tab when the dismissed list changes. */
+export function onDismissedLowStockChange(handler: () => void): () => void {
+  window.addEventListener(DISMISSED_EVENT, handler);
+  return () => window.removeEventListener(DISMISSED_EVENT, handler);
 }

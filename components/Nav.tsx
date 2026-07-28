@@ -4,7 +4,12 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
-import { loadLowStockThreshold, onLowStockThresholdChange } from "@/lib/low-stock";
+import {
+  loadDismissedLowStock,
+  loadLowStockThreshold,
+  onDismissedLowStockChange,
+  onLowStockThresholdChange,
+} from "@/lib/low-stock";
 
 const POLL_MS = 30000;
 
@@ -18,12 +23,18 @@ export default function Nav() {
 
     async function fetchCount() {
       const supabase = createBrowserClient();
-      const { count, error } = await supabase
+      const { data, error } = await supabase
         .from("inventory")
-        .select("id", { count: "exact", head: true })
+        .select("id, stock")
         .lte("stock", threshold);
 
-      if (!cancelled && !error) setLowStockCount(count ?? 0);
+      if (cancelled || error) return;
+
+      const dismissed = loadDismissedLowStock();
+      const visible = (data ?? []).filter(
+        (item) => dismissed[item.id] !== item.stock
+      );
+      setLowStockCount(visible.length);
     }
 
     fetchCount();
@@ -34,16 +45,18 @@ export default function Nav() {
     }
     window.addEventListener("focus", onFocus);
 
-    const unsubscribe = onLowStockThresholdChange((value) => {
+    const unsubscribeThreshold = onLowStockThresholdChange((value) => {
       threshold = value;
       fetchCount();
     });
+    const unsubscribeDismissed = onDismissedLowStockChange(fetchCount);
 
     return () => {
       cancelled = true;
       clearInterval(interval);
       window.removeEventListener("focus", onFocus);
-      unsubscribe();
+      unsubscribeThreshold();
+      unsubscribeDismissed();
     };
   }, []);
 
@@ -84,8 +97,8 @@ export default function Nav() {
               >
                 {tab.label}
                 {!!tab.badge && (
-                  <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-[#E0457B] px-1 text-[10px] font-bold tabular-nums text-white">
-                    {tab.badge > 99 ? "99+" : tab.badge}
+                  <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-[#E0457B] px-1.5 text-[10px] font-bold tabular-nums text-white">
+                    {tab.badge}
                   </span>
                 )}
               </Link>

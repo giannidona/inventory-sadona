@@ -1,17 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { getPriceChanges } from "@/app/actions/price-changes";
 import { formatPrice } from "@/lib/invoice-utils";
 import { mercadoLibreSearchUrl } from "@/lib/marketplace-links";
 import { ShoppingBagIcon } from "@/components/icons";
+import { loadDismissedIds, saveDismissedIds } from "@/lib/dismissed-ids";
 import type { PriceChange } from "@/lib/types";
 import { toast } from "sonner";
+
+const DISMISSED_KEY = "sadona:dismissedPriceChanges";
 
 export default function PriceChangesPage() {
   const [changes, setChanges] = useState<PriceChange[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dismissed, setDismissed] = useState<Set<string>>(() =>
+    loadDismissedIds(DISMISSED_KEY)
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -36,6 +42,31 @@ export default function PriceChangesPage() {
     };
   }, []);
 
+  const visibleChanges = useMemo(
+    () => changes.filter((c) => !dismissed.has(c.id)),
+    [changes, dismissed]
+  );
+
+  function dismissOne(id: string) {
+    setDismissed((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      saveDismissedIds(DISMISSED_KEY, next);
+      return next;
+    });
+  }
+
+  function dismissAll() {
+    if (visibleChanges.length === 0) return;
+    setDismissed((prev) => {
+      const next = new Set(prev);
+      for (const change of visibleChanges) next.add(change.id);
+      saveDismissedIds(DISMISSED_KEY, next);
+      return next;
+    });
+    toast.success("Lista de precios borrada");
+  }
+
   return (
     <div className="page-container px-4 py-6">
       <div className="mb-6">
@@ -43,10 +74,19 @@ export default function PriceChangesPage() {
           <h1 className="text-2xl font-semibold text-white">
             Cambios de precio
           </h1>
-          {!loading && changes.length > 0 && (
+          {!loading && visibleChanges.length > 0 && (
             <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-[#E0457B]/20 px-1.5 text-xs font-bold tabular-nums text-[#E0457B]">
-              {changes.length}
+              {visibleChanges.length}
             </span>
+          )}
+          {!loading && visibleChanges.length > 0 && (
+            <button
+              type="button"
+              onClick={dismissAll}
+              className="text-xs font-medium text-white/50 transition-colors hover:text-white"
+            >
+              Limpiar todo
+            </button>
           )}
         </div>
         <p className="mt-1 text-sm text-white/50">
@@ -59,14 +99,17 @@ export default function PriceChangesPage() {
         <div className="glass-card p-12 text-center text-white/50">
           Cargando cambios de precio...
         </div>
-      ) : changes.length === 0 ? (
+      ) : visibleChanges.length === 0 ? (
         <div className="glass-card p-12 text-center">
           <p className="text-white/50">
-            Todavía no se detectó ningún cambio de precio
+            {changes.length > 0
+              ? "Limpiaste todos los cambios de precio"
+              : "Todavía no se detectó ningún cambio de precio"}
           </p>
           <p className="mt-1 text-xs text-white/30">
-            Subí una factura de un producto que ya tenga precio cargado y,
-            si viene distinto, va a aparecer acá.
+            {changes.length > 0
+              ? "Los que se detecten de acá en más van a aparecer arriba."
+              : "Subí una factura de un producto que ya tenga precio cargado y, si viene distinto, va a aparecer acá."}
           </p>
         </div>
       ) : (
@@ -88,13 +131,24 @@ export default function PriceChangesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {changes.map((change) => (
+                  {visibleChanges.map((change) => (
                     <tr
                       key={change.id}
                       className="border-b border-white/5 transition-colors hover:bg-white/[0.02]"
                     >
                       <td className="px-4 py-3 font-medium text-white">
-                        {change.product_name}
+                        <div className="flex items-center gap-2">
+                          <span>{change.product_name}</span>
+                          <button
+                            type="button"
+                            onClick={() => dismissOne(change.id)}
+                            title="Quitar de la lista"
+                            aria-label="Quitar de la lista"
+                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-white/30 transition-colors hover:bg-white/10 hover:text-white"
+                          >
+                            ✕
+                          </button>
+                        </div>
                       </td>
                       <td className="px-4 py-3 font-mono text-white/50">
                         {change.sku ?? "—"}
@@ -148,13 +202,24 @@ export default function PriceChangesPage() {
 
           {/* Mobile cards */}
           <div className="space-y-3 md:hidden">
-            {changes.map((change) => (
+            {visibleChanges.map((change) => (
               <div key={change.id} className="glass-card p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
-                    <h3 className="truncate font-semibold text-white">
-                      {change.product_name}
-                    </h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="truncate font-semibold text-white">
+                        {change.product_name}
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => dismissOne(change.id)}
+                        title="Quitar de la lista"
+                        aria-label="Quitar de la lista"
+                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-white/30 transition-colors hover:bg-white/10 hover:text-white"
+                      >
+                        ✕
+                      </button>
+                    </div>
                     <div className="mt-0.5 flex items-center gap-2">
                       <p className="font-mono text-xs text-white/50">
                         {change.sku ?? "—"}

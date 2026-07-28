@@ -41,3 +41,28 @@ export function onLowStockThresholdChange(
   window.addEventListener(THRESHOLD_EVENT, listener);
   return () => window.removeEventListener(THRESHOLD_EVENT, listener);
 }
+
+// Products dismissed from the notifications list, stored per-browser.
+// Maps product id -> stock at the moment it was dismissed, so a product
+// reappears automatically once its stock changes again.
+export type DismissedLowStockMap = Record<string, number>;
+
+const DISMISSED_KEY = "sadona:dismissedLowStock";
+
+export function loadDismissedLowStock(): DismissedLowStockMap {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(DISMISSED_KEY);
+    return raw ? (JSON.parse(raw) as DismissedLowStockMap) : {};
+  } catch {
+    return {};
+  }
+}
+
+export function saveDismissedLowStock(map: DismissedLowStockMap): void {
+  try {
+    window.localStorage.setItem(DISMISSED_KEY, JSON.stringify(map));
+  } catch {
+    // ignore storage errors (private mode, quota, etc.)
+  }
+}

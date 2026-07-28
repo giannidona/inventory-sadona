@@ -16,8 +16,12 @@ import {
   formatPrice,
 } from "@/lib/invoice-utils";
 import {
+  loadDismissedLowStock,
   loadLowStockThreshold,
   onLowStockThresholdChange,
+  saveDismissedLowStock,
+  saveLowStockThreshold,
+  type DismissedLowStockMap,
 } from "@/lib/low-stock";
 import ProductActionIcons from "@/components/ProductActionIcons";
 import type { InventoryItem } from "@/lib/types";
@@ -25,7 +29,16 @@ import { toast } from "sonner";
 
 type StockSort = null | "asc" | "desc";
 
-export default function InventoryDashboard() {
+type InventoryDashboardProps = {
+  title?: string;
+  /** Locks the view to only show low-stock products (used by /notifications). */
+  lockToLowStock?: boolean;
+};
+
+export default function InventoryDashboard({
+  title = "Inventario",
+  lockToLowStock = false,
+}: InventoryDashboardProps) {
   const searchParams = useSearchParams();
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,8 +47,14 @@ export default function InventoryDashboard() {
   const [lowStockThreshold, setLowStockThreshold] = useState<number>(
     () => loadLowStockThreshold()
   );
+  const [thresholdInput, setThresholdInput] = useState<string>(() =>
+    String(loadLowStockThreshold())
+  );
   const [lowStockOnly, setLowStockOnly] = useState(
-    () => searchParams.get("low") === "1"
+    () => lockToLowStock || searchParams.get("low") === "1"
+  );
+  const [dismissed, setDismissed] = useState<DismissedLowStockMap>(() =>
+    lockToLowStock ? loadDismissedLowStock() : {}
   );
   const [editProduct, setEditProduct] = useState<InventoryItem | null>(null);
   const [historyProduct, setHistoryProduct] = useState<InventoryItem | null>(null);
@@ -72,7 +91,10 @@ export default function InventoryDashboard() {
   }, []);
 
   useEffect(() => {
-    return onLowStockThresholdChange(setLowStockThreshold);
+    return onLowStockThresholdChange((value) => {
+      setLowStockThreshold(value);
+      setThresholdInput(String(value));
+    });
   }, []);
 
   const filtered = useMemo(() => {
@@ -90,6 +112,10 @@ export default function InventoryDashboard() {
       list = list.filter((item) => item.stock <= lowStockThreshold);
     }
 
+    if (lockToLowStock) {
+      list = list.filter((item) => dismissed[item.id] !== item.stock);
+    }
+
     if (!stockSort) return list;
 
     return [...list].sort((a, b) => {
@@ -97,7 +123,15 @@ export default function InventoryDashboard() {
         stockSort === "desc" ? b.stock - a.stock : a.stock - b.stock;
       return diff !== 0 ? diff : a.name.localeCompare(b.name);
     });
-  }, [items, search, stockSort, lowStockOnly, lowStockThreshold]);
+  }, [
+    items,
+    search,
+    stockSort,
+    lowStockOnly,
+    lowStockThreshold,
+    lockToLowStock,
+    dismissed,
+  ]);
 
   const lowStockCount = useMemo(
     () => items.filter((item) => item.stock <= lowStockThreshold).length,
@@ -108,6 +142,38 @@ export default function InventoryDashboard() {
     setStockSort((prev) =>
       prev === null ? "desc" : prev === "desc" ? "asc" : null
     );
+  }
+
+  function saveThreshold() {
+    const value = parseInt(thresholdInput, 10);
+    if (!Number.isFinite(value) || value < 0) {
+      toast.error("Ingresá un número válido");
+      return;
+    }
+    setLowStockThreshold(value);
+    saveLowStockThreshold(value);
+    toast.success(`Alerta configurada en esta computadora: stock ≤ ${value}`);
+  }
+
+  const thresholdChanged = thresholdInput !== String(lowStockThreshold);
+
+  function dismissItem(id: string, stock: number) {
+    setDismissed((prev) => {
+      const next = { ...prev, [id]: stock };
+      saveDismissedLowStock(next);
+      return next;
+    });
+  }
+
+  function dismissAll() {
+    if (filtered.length === 0) return;
+    setDismissed((prev) => {
+      const next = { ...prev };
+      for (const item of filtered) next[item.id] = item.stock;
+      saveDismissedLowStock(next);
+      return next;
+    });
+    toast.success("Notificaciones borradas");
   }
 
   const totalInvestment = useMemo(
@@ -190,28 +256,44 @@ export default function InventoryDashboard() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-lg font-semibold text-white">Inventario</h1>
+              <h1 className="text-lg font-semibold text-white">{title}</h1>
               {!loading && (
                 <span
                   className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#E0457B]/20 px-1.5 text-[11px] font-bold tabular-nums text-[#E0457B]"
                   title={
-                    search.trim()
+                    search.trim() || lockToLowStock
                       ? `${filtered.length} de ${items.length} productos`
                       : `${items.length} productos`
                   }
                 >
-                  {search.trim() ? filtered.length : items.length}
+                  {search.trim() || lockToLowStock ? filtered.length : items.length}
                 </span>
               )}
+              {lockToLowStock && !loading && filtered.length > 0 && (
+                <button
+                  type="button"
+                  onClick={dismissAll}
+                  className="text-xs font-medium text-white/50 transition-colors hover:text-white"
+                >
+                  Limpiar todo
+                </button>
+              )}
             </div>
-            {!loading && items.length > 0 && (
+            {lockToLowStock ? (
               <p className="mt-1 text-sm text-white/50">
-                Total invertido{" "}
-                <span className="font-medium text-[#E0457B]">
-                  {formatPrice(totalInvestment)}
-                </span>
-                <span className="text-white/40"> (precio × stock + 21% IVA)</span>
+                Productos con stock igual o menor al umbral de alerta.
               </p>
+            ) : (
+              !loading &&
+              items.length > 0 && (
+                <p className="mt-1 text-sm text-white/50">
+                  Total invertido{" "}
+                  <span className="font-medium text-[#E0457B]">
+                    {formatPrice(totalInvestment)}
+                  </span>
+                  <span className="text-white/40"> (precio × stock + 21% IVA)</span>
+                </p>
+              )
             )}
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -222,7 +304,7 @@ export default function InventoryDashboard() {
               onChange={(e) => setSearch(e.target.value)}
               className="input w-full sm:max-w-md"
             />
-            {lowStockCount > 0 && (
+            {!lockToLowStock && lowStockCount > 0 && (
               <button
                 type="button"
                 onClick={() => setLowStockOnly((v) => !v)}
@@ -240,50 +322,81 @@ export default function InventoryDashboard() {
           </div>
         </div>
 
-        <div className="flex flex-col gap-3">
-          {cameraActive ? (
-            <button
-              type="button"
-              onClick={closeCamera}
-              className="w-full rounded-xl bg-red-500 py-3 text-sm font-bold text-white transition-colors hover:bg-red-600 sm:w-auto sm:px-6"
-            >
-              ✕ Cerrar cámara
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => {
-                setCameraError(null);
-                setCameraActive(true);
-              }}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#E0457B] py-3 text-sm font-semibold text-white transition-colors hover:bg-[#c93a6a] sm:w-auto sm:px-6"
-            >
-              <CameraIcon />
-              Escanear
-            </button>
-          )}
+        {lockToLowStock && (
+          <div className="glass-card flex flex-wrap items-center gap-2 px-4 py-3">
+            <label htmlFor="low-stock-threshold-input" className="text-sm text-white/60">
+              Avisarme cuando el stock sea ≤
+            </label>
+            <input
+              id="low-stock-threshold-input"
+              type="number"
+              min="0"
+              value={thresholdInput}
+              onChange={(e) => setThresholdInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && saveThreshold()}
+              className="w-20 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-center text-sm font-semibold text-white outline-none focus:border-[#E0457B]/50"
+            />
+            {thresholdChanged && (
+              <button
+                type="button"
+                onClick={saveThreshold}
+                className="rounded-lg bg-[#E0457B] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#c93a6a]"
+              >
+                Guardar
+              </button>
+            )}
+            <span className="text-xs text-white/30">
+              (se guarda solo en esta computadora)
+            </span>
+          </div>
+        )}
 
-          {cameraActive && (
-            <div className="space-y-2">
-              <BarcodeScanner
-                active={scannerActive}
-                onScan={lookupByEan}
-                onError={(msg) => {
-                  setCameraError(msg);
-                  toast.error(msg);
+        {!lockToLowStock && (
+          <div className="flex flex-col gap-3">
+            {cameraActive ? (
+              <button
+                type="button"
+                onClick={closeCamera}
+                className="w-full rounded-xl bg-red-500 py-3 text-sm font-bold text-white transition-colors hover:bg-red-600 sm:w-auto sm:px-6"
+              >
+                ✕ Cerrar cámara
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setCameraError(null);
+                  setCameraActive(true);
                 }}
-              />
-              {cameraError && (
-                <p className="text-center text-sm text-red-400">{cameraError}</p>
-              )}
-              {scannerActive && (
-                <p className="text-center text-sm text-white/50">
-                  Apuntá la cámara al código de barras
-                </p>
-              )}
-            </div>
-          )}
-        </div>
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#E0457B] py-3 text-sm font-semibold text-white transition-colors hover:bg-[#c93a6a] sm:w-auto sm:px-6"
+              >
+                <CameraIcon />
+                Escanear
+              </button>
+            )}
+
+            {cameraActive && (
+              <div className="space-y-2">
+                <BarcodeScanner
+                  active={scannerActive}
+                  onScan={lookupByEan}
+                  onError={(msg) => {
+                    setCameraError(msg);
+                    toast.error(msg);
+                  }}
+                />
+                {cameraError && (
+                  <p className="text-center text-sm text-red-400">{cameraError}</p>
+                )}
+                {scannerActive && (
+                  <p className="text-center text-sm text-white/50">
+                    Apuntá la cámara al código de barras
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {loading ? (
@@ -292,7 +405,11 @@ export default function InventoryDashboard() {
         </div>
       ) : filtered.length === 0 ? (
         <div className="glass-card p-12 text-center text-white/50">
-          {search ? "No se encontraron productos" : "No hay productos en el inventario"}
+          {search
+            ? "No se encontraron productos"
+            : lockToLowStock
+              ? "Ningún producto está con stock bajo ahora mismo"
+              : "No hay productos en el inventario"}
         </div>
       ) : (
         <>
@@ -334,7 +451,22 @@ export default function InventoryDashboard() {
                       key={item.id}
                       className="border-b border-white/5 transition-colors hover:bg-white/[0.02]"
                     >
-                      <td className="px-4 py-3 font-medium text-white">{item.name}</td>
+                      <td className="px-4 py-3 font-medium text-white">
+                        <div className="flex items-center gap-2">
+                          <span>{item.name}</span>
+                          {lockToLowStock && (
+                            <button
+                              type="button"
+                              onClick={() => dismissItem(item.id, item.stock)}
+                              title="Quitar de notificaciones"
+                              aria-label="Quitar de notificaciones"
+                              className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-white/30 transition-colors hover:bg-white/10 hover:text-white"
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
+                      </td>
                       <td className="px-4 py-3 font-mono text-white/70">{item.sku}</td>
                       <td className="px-4 py-3 font-mono text-white/50">
                         {item.ean ?? "—"}
@@ -379,7 +511,20 @@ export default function InventoryDashboard() {
               <div key={item.id} className="glass-card p-4">
                 <div className="mb-3 flex items-start justify-between gap-3">
                   <div>
-                    <h3 className="text-lg font-semibold text-white">{item.name}</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-lg font-semibold text-white">{item.name}</h3>
+                      {lockToLowStock && (
+                        <button
+                          type="button"
+                          onClick={() => dismissItem(item.id, item.stock)}
+                          title="Quitar de notificaciones"
+                          aria-label="Quitar de notificaciones"
+                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-white/30 transition-colors hover:bg-white/10 hover:text-white"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
                     <p className="mt-0.5 font-mono text-xs text-white/50">
                       {item.sku}
                       {item.ean && ` · ${item.ean}`}

@@ -12,54 +12,77 @@ IMPORTANTE: Si el PDF tiene MÚLTIPLES PÁGINAS, leé TODAS las páginas y extra
 
 ## Formato típico de la factura
 - Encabezado: proveedor (ej: CEMAFELU S.A.), CUIT, domicilio, "Factura A" o "Factura B"
-- Número de factura: formato XXXX-XXXXXXXX (ej: 0009-000071663)
-- Fecha: DD/MM/YY
-- Tabla con columnas: CANTIDAD | DESCRIPCION | P.UNIT. | IVA | IMPORTE
-- DESCRIPCION formato: CODIGO-NOMBRE PRODUCTO (ej: "23993-ESTRELLA ALGODON CLASICO x75Grs")
-  - El código numérico antes del guión es el SKU/código del producto
-  - Lo que sigue al guión es el nombre del producto
-  - La primera palabra del nombre suele ser la marca (ESTRELLA, TRESEMME, etc.)
-- CANTIDAD formato: "4,000 Unid" = 4 unidades (la coma y los ceros son decimales de presentación, NO miles)
+- Número de factura: formato XXXX-XXXXXXXX (ej: 0009-000074590)
+- Fecha: DD/MM/YY (a veces con hora al lado, ej: "28/07/26 - 12:04:26" → usá solo la fecha)
 - Precios en formato argentino: coma decimal, punto miles (ej: "662,44" = 662.44, "397.284,44" = 397284.44)
-- P.UNIT. = precio unitario por unidad
-- Pie de factura: SubTotal, IVA, Importe Total, CAE, vencimiento CAE, TOTAL UNIDADES, cantidad de ítems
+- La primera palabra del nombre del producto (después del código) suele ser la marca
+
+## La tabla de productos puede venir en DOS formatos distintos — fijate cuál es antes de extraer
+
+**Formato A** (columnas: CANTIDAD | DESCRIPCION | P.UNIT. | IVA | IMPORTE):
+- DESCRIPCION: "CODIGO-NOMBRE" donde CODIGO tiene 4 a 6 dígitos → es el SKU interno del mayorista
+- CANTIDAD viene como "4,000 Unid" = 4 unidades (la coma y los ceros son decimales de presentación, NO miles)
+- P.UNIT. = precio unitario por unidad, se usa directo
+
+**Formato B**, más nuevo (columnas: DESCRIPCION | P.LISTA | DTO | P.UNIT | UNIDAD | IVA | IMPORTE):
+- DESCRIPCION: "CODIGO-NOMBRE" donde CODIGO tiene 8 dígitos o más (EAN-13/UPC-A, código de barras) → NO es un SKU, es el EAN del producto
+- UNIDAD viene como número entero simple (ej: "6", "12", "24"), sin ", Unid" — es la cantidad
+- P.LISTA es el precio de lista SIN descuento — IGNORALO
+- P.UNIT es el precio YA con el descuento (DTO) aplicado — ese es el que va en unit_price
+- Esta es la factura de este tipo. Este formato ya NO trae el SKU interno, solo el EAN.
+
+## Cómo clasificar el código antes del guión en DESCRIPCION (en cualquiera de los dos formatos)
+- 4 a 6 dígitos → campo "sku", dejá "ean" en null
+- 8 dígitos o más → campo "ean", dejá "sku" en null
+NUNCA pongas el mismo valor en los dos campos a la vez.
+
+## Totales (pie de factura)
+Algunas facturas muestran primero "Total Sin Descuentos" y una sección de "DESCUENTOS /
+BONIFICACIONES" (montos negativos), y recién después la tabla final con SubTotal /
+Alicuota IVA / Total IVA / Perc.IVA / Importe Total.
+- Usá SIEMPRE los valores de esa tabla FINAL (ya con descuentos aplicados), nunca "Total Sin Descuentos"
+- subtotal = "SubTotal" de esa tabla final
+- iva_amount = "Total IVA" (NO "Perc.IVA", que es una percepción/retención distinta)
+- total = "Importe Total" (el número final)
+- También están: CAE, vencimiento CAE, TOTAL UNIDADES, cantidad de ítems (Items)
 
 ## Respondé ÚNICAMENTE con JSON válido (sin markdown):
 {
-  "invoice_number": "0009-000071663",
+  "invoice_number": "0009-000074590",
   "invoice_type": "A",
   "supplier": "CEMAFELU S.A.",
   "supplier_cuit": "30710164637",
-  "invoice_date": "2026-06-02",
-  "cae": "86228010177550",
-  "cae_expiry": "2026-06-02",
-  "subtotal": 397284.44,
-  "iva_amount": 83429.73,
-  "total": 480714.17,
-  "total_units": 183,
-  "item_count": 53,
+  "invoice_date": "2026-07-28",
+  "cae": "86305743229654",
+  "cae_expiry": "2026-07-28",
+  "subtotal": 875578.63,
+  "iva_amount": 183871.51,
+  "total": 1080669.29,
+  "total_units": 160,
+  "item_count": 27,
   "notes": "observaciones del pie de factura o null",
   "lines": [
     {
-      "description": "23993-ESTRELLA ALGODON CLASICO x75Grs",
-      "sku": "23993",
-      "name": "ESTRELLA ALGODON CLASICO x75Grs",
-      "marca": "ESTRELLA",
-      "quantity": 4,
-      "unit_price": 662.44
+      "description": "7798140259435-ASEPXIA CARBON GEL EXFO x120",
+      "sku": null,
+      "ean": "7798140259435",
+      "name": "ASEPXIA CARBON GEL EXFO x120",
+      "marca": "ASEPXIA",
+      "quantity": 6,
+      "unit_price": 7177.10
     }
   ]
 }
 
 ## Reglas estrictas
 1. Incluí TODOS los productos de TODAS las páginas del PDF
-2. quantity: entero positivo (4,000 Unid → 4, 12,000 Unid → 12, 1,000 Unid → 1)
-3. unit_price: número decimal con punto (convertí de formato argentino)
-4. sku: código numérico antes del guión en DESCRIPCION
+2. quantity: entero positivo. "4,000 Unid" → 4. Número simple como "6" → 6 directo
+3. unit_price: número decimal con punto (convertí de formato argentino). Si hay P.LISTA y P.UNIT, usá SIEMPRE P.UNIT (con descuento), nunca P.LISTA
+4. Código antes del guión en DESCRIPCION: 4-6 dígitos → "sku" (dejando "ean" null), 8+ dígitos → "ean" (dejando "sku" null). Nunca los dos a la vez
 5. name: texto después del guión, sin el código
-6. item_count: cantidad total de líneas/ítems que indica la factura (ej: "Items: 53")
-7. total_units: suma de unidades del pie (ej: "TOTAL UNIDADES: 183")
-8. total/subtotal/iva_amount: del pie de factura, convertidos a número decimal
+6. item_count: cantidad total de líneas/ítems que indica la factura (ej: "Items: 27")
+7. total_units: suma de unidades del pie (ej: "TOTAL UNIDADES: 160")
+8. subtotal/iva_amount/total: SIEMPRE de la tabla final post-descuentos, nunca de "Total Sin Descuentos"
 9. invoice_date y cae_expiry en formato ISO YYYY-MM-DD
 10. Si un campo no aparece, usá null
 11. NO inventes productos que no estén en la factura

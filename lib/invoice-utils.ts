@@ -36,21 +36,33 @@ export function parseArgentineQuantity(value: string | number | null | undefined
   return num != null ? Math.round(num) : 0;
 }
 
-/** Splits doan-style "23993-ESTRELLA ALGODON CLASICO x75Grs" */
+/**
+ * Splits doan-style "CODIGO-NOMBRE" descriptions, e.g.:
+ *   "23993-ESTRELLA ALGODON CLASICO x75Grs" (SKU interno, 4-6 dígitos)
+ *   "7798140259435-ASEPXIA CARBON GEL EXFO x120" (EAN/código de barras, 8+ dígitos)
+ *
+ * Las facturas más nuevas del mayorista ya no traen el SKU interno, solo el
+ * EAN del producto — por eso el código se clasifica según su longitud.
+ */
 export function splitProductDescription(description: string): {
   sku?: string;
+  ean?: string;
   name: string;
   marca?: string;
 } {
   const trimmed = description.trim();
-  const match = trimmed.match(/^(\d{4,6})-(.+)$/);
+  const match = trimmed.match(/^(\d{4,14})-(.+)$/);
   if (!match) return { name: trimmed };
 
-  const sku = match[1];
+  const code = match[1];
   const name = match[2].trim();
   const marca = extractBrandFromName(name);
 
-  return { sku, name, marca };
+  // 4-6 dígitos: código interno del mayorista (SKU). 8+ dígitos: EAN-13/UPC-A.
+  if (code.length >= 8) {
+    return { ean: code, name, marca };
+  }
+  return { sku: code, name, marca };
 }
 
 function extractBrandFromName(name: string): string | undefined {
@@ -79,17 +91,20 @@ export function normalizeInvoiceLine(line: {
 } | null {
   let name = line.name?.trim() || line.description?.trim() || "";
   let sku = line.sku?.trim() || undefined;
+  let ean = line.ean?.trim() || undefined;
   let marca = line.marca?.trim() || undefined;
 
   if (!name && line.description) {
     const split = splitProductDescription(line.description);
     name = split.name;
     sku = sku || split.sku;
+    ean = ean || split.ean;
     marca = marca || split.marca;
-  } else if (/^\d{4,6}-/.test(name)) {
+  } else if (/^\d{4,14}-/.test(name)) {
     const split = splitProductDescription(name);
     name = split.name;
     sku = sku || split.sku;
+    ean = ean || split.ean;
     marca = marca || split.marca;
   }
 
@@ -101,7 +116,7 @@ export function normalizeInvoiceLine(line: {
   return {
     name,
     sku,
-    ean: line.ean?.trim() || undefined,
+    ean,
     marca: marca || extractBrandFromName(name),
     quantity,
     unit_price,

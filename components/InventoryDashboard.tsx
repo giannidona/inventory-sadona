@@ -24,10 +24,11 @@ import {
   type DismissedLowStockMap,
 } from "@/lib/low-stock";
 import ProductActionIcons from "@/components/ProductActionIcons";
+import { HistoryIcon } from "@/components/icons";
 import type { InventoryItem } from "@/lib/types";
 import { toast } from "sonner";
 
-type StockSort = null | "asc" | "desc";
+type SortMode = "name" | "stock-desc" | "stock-asc" | "newest" | "oldest";
 
 type InventoryDashboardProps = {
   title?: string;
@@ -43,7 +44,7 @@ export default function InventoryDashboard({
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [stockSort, setStockSort] = useState<StockSort>(null);
+  const [sortMode, setSortMode] = useState<SortMode>("name");
   const [lowStockThreshold, setLowStockThreshold] = useState<number>(
     () => loadLowStockThreshold()
   );
@@ -116,17 +117,27 @@ export default function InventoryDashboard({
       list = list.filter((item) => dismissed[item.id] !== item.stock);
     }
 
-    if (!stockSort) return list;
+    if (sortMode === "stock-desc" || sortMode === "stock-asc") {
+      return [...list].sort((a, b) => {
+        const diff =
+          sortMode === "stock-desc" ? b.stock - a.stock : a.stock - b.stock;
+        return diff !== 0 ? diff : a.name.localeCompare(b.name);
+      });
+    }
 
-    return [...list].sort((a, b) => {
-      const diff =
-        stockSort === "desc" ? b.stock - a.stock : a.stock - b.stock;
-      return diff !== 0 ? diff : a.name.localeCompare(b.name);
-    });
+    if (sortMode === "newest" || sortMode === "oldest") {
+      return [...list].sort((a, b) => {
+        const diff =
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        return sortMode === "newest" ? diff : -diff;
+      });
+    }
+
+    return list;
   }, [
     items,
     search,
-    stockSort,
+    sortMode,
     lowStockOnly,
     lowStockThreshold,
     lockToLowStock,
@@ -139,8 +150,14 @@ export default function InventoryDashboard({
   );
 
   function cycleStockSort() {
-    setStockSort((prev) =>
-      prev === null ? "desc" : prev === "desc" ? "asc" : null
+    setSortMode((prev) =>
+      prev === "stock-desc" ? "stock-asc" : prev === "stock-asc" ? "name" : "stock-desc"
+    );
+  }
+
+  function cycleDateSort() {
+    setSortMode((prev) =>
+      prev === "newest" ? "oldest" : prev === "oldest" ? "name" : "newest"
     );
   }
 
@@ -319,6 +336,25 @@ export default function InventoryDashboard({
                 Stock bajo ({lowStockCount})
               </button>
             )}
+            <button
+              type="button"
+              onClick={cycleDateSort}
+              className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl border px-3 py-2.5 text-xs font-semibold transition-colors sm:py-2 ${
+                sortMode === "newest" || sortMode === "oldest"
+                  ? "border-[#E0457B]/40 bg-[#E0457B]/10 text-[#E0457B]"
+                  : "border-white/10 text-white/60 hover:bg-white/5"
+              }`}
+              title={
+                sortMode === "newest"
+                  ? "Ordenado: más nuevos primero (clic para invertir)"
+                  : sortMode === "oldest"
+                    ? "Ordenado: más antiguos primero (clic para quitar)"
+                    : "Ordenar por fecha de creación"
+              }
+            >
+              <RecentIcon />
+              {sortMode === "oldest" ? "Más antiguos" : "Recientes"}
+            </button>
           </div>
         </div>
 
@@ -428,15 +464,23 @@ export default function InventoryDashboard({
                         onClick={cycleStockSort}
                         className="inline-flex items-center gap-1 transition-colors hover:text-white"
                         title={
-                          stockSort === "desc"
+                          sortMode === "stock-desc"
                             ? "Ordenado: mayor a menor stock"
-                            : stockSort === "asc"
+                            : sortMode === "stock-asc"
                               ? "Ordenado: menor a mayor stock"
-                              : "Ordenado por nombre (click para ordenar por stock)"
+                              : "Ordenar por stock"
                         }
                       >
                         Stock
-                        <StockSortIcon sort={stockSort} />
+                        <StockSortIcon
+                          sort={
+                            sortMode === "stock-desc"
+                              ? "desc"
+                              : sortMode === "stock-asc"
+                                ? "asc"
+                                : null
+                          }
+                        />
                       </button>
                     </th>
                     <th className="px-4 py-3 font-medium">Precio</th>
@@ -617,7 +661,7 @@ export default function InventoryDashboard({
   );
 }
 
-function StockSortIcon({ sort }: { sort: StockSort }) {
+function StockSortIcon({ sort }: { sort: "asc" | "desc" | null }) {
   if (sort === "desc") {
     return (
       <svg

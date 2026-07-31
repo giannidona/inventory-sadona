@@ -13,6 +13,7 @@ import type { InvoiceLineInput, ProcessInvoiceInput } from "@/lib/types";
 import { toast } from "sonner";
 
 type LineRow = InvoiceLineInput & { key: string };
+type DocType = "doan" | "pedido";
 
 function emptyLine(): LineRow {
   return {
@@ -31,6 +32,7 @@ export default function InvoiceUploadForm() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [file, setFile] = useState<File | null>(null);
+  const [docType, setDocType] = useState<DocType>("doan");
   const [analyzing, setAnalyzing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showManual, setShowManual] = useState(false);
@@ -65,6 +67,7 @@ export default function InvoiceUploadForm() {
     setAnalyzing(true);
     const formData = new FormData();
     formData.append("file", file);
+    formData.append("docType", docType);
 
     const result = await parseInvoiceDocument(formData);
     setAnalyzing(false);
@@ -199,12 +202,42 @@ export default function InvoiceUploadForm() {
         <div className="glass-card space-y-5 p-6">
           <div>
             <h2 className="text-lg font-semibold text-white">
-              Subir factura (PDF)
+              Subir factura o pedido
             </h2>
             <p className="mt-1 text-sm text-white/50">
-              Subí el PDF y Claude lo leerá automáticamente. Después podés
-              verificar los datos antes de guardar.
+              Subí el PDF o imagen y Claude lo leerá automáticamente. Después
+              podés verificar los datos antes de guardar.
             </p>
+          </div>
+
+          <div>
+            <span className="mb-1.5 block text-xs font-medium text-white/60">
+              Tipo de documento
+            </span>
+            <div className="inline-flex rounded-xl border border-white/10 p-1">
+              <button
+                type="button"
+                onClick={() => setDocType("doan")}
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  docType === "doan"
+                    ? "bg-[#E0457B] text-white"
+                    : "text-white/60 hover:text-white"
+                }`}
+              >
+                Factura Doan
+              </button>
+              <button
+                type="button"
+                onClick={() => setDocType("pedido")}
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  docType === "pedido"
+                    ? "bg-[#E0457B] text-white"
+                    : "text-white/60 hover:text-white"
+                }`}
+              >
+                Pedido
+              </button>
+            </div>
           </div>
 
           <div
@@ -261,8 +294,12 @@ export default function InvoiceUploadForm() {
             {analyzing ? (
               <span className="flex items-center justify-center gap-2">
                 <Spinner />
-                Claude está leyendo la factura...
+                {docType === "pedido"
+                  ? "Claude está leyendo el pedido..."
+                  : "Claude está leyendo la factura..."}
               </span>
+            ) : docType === "pedido" ? (
+              "Analizar pedido con IA"
             ) : (
               "Analizar factura con IA"
             )}

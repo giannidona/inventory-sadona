@@ -88,6 +88,79 @@ Alicuota IVA / Total IVA / Perc.IVA / Importe Total.
 11. NO inventes productos que no estén en la factura
 12. NO omitas líneas aunque el PDF sea largo`;
 
+const PEDIDO_EXTRACTION_PROMPT = `Sos un extractor de "pedidos" (órdenes de compra a mayoristas), un formato de documento distinto al de factura fiscal.
+
+IMPORTANTE: Si el documento tiene MÚLTIPLES PÁGINAS, leé TODAS las páginas y extraé TODOS los ítems. No omitas ninguna línea.
+
+## Formato del pedido
+Es una lista numerada de productos, una línea (a veces dos, cuando el nombre es largo y envuelve) por ítem:
+
+  N) SKU  CANTIDAD x  DESCRIPCION   PRECIO_UNITARIO   IMPORTE
+
+Ejemplos reales:
+  "1) 51000  12 x RTO MACH 3 TURBO - X 4 (X PACK)  9516.00  114192.00"
+  "2) 4217  12 x EXCELLENCE RUBIO ULTRA CLARO CENIZA TONO 121 KITx1  12339.00  148068.00"
+  (la descripción a veces continúa en una segunda línea antes del precio, ej. "KITx1" o "400 ML." — unila con el resto del nombre)
+  "16) 1653  6 x GARNIER SKIN ACT AGUA MICELAR ANTI IMPERF 400 ML.  11779.00  70674.00"
+
+- SKU: el número justo después de "N)", 4-6 dígitos — es el código interno del mayorista
+- CANTIDAD: el número antes de "x" (ej. "12 x" = 12 unidades)
+- DESCRIPCION: el texto entre la cantidad y el precio unitario (uniendo líneas que envuelven)
+- PRECIO_UNITARIO: primer número de precio en la línea
+- IMPORTE: segundo número (= cantidad × precio unitario, usalo solo para verificar, no hace falta reportarlo)
+- Precios en formato con punto decimal (ej. "9516.00" = 9516.00), no confundir con formato argentino de coma decimal
+
+## Pie del pedido
+Al final aparecen estos datos (pueden variar el orden):
+- "Unidades: N" → total_units
+- "Pedido: P-XXXX-XXXXXXXX" → usalo como invoice_number
+- "Cliente: CODIGO-NOMBRE (X)" → quién hizo el pedido, va en notes como "Cliente: ..."
+- "Fecha: DD/MM/YYYY" → invoice_date
+- "Vendedor: CODIGO-NOMBRE" → va en notes como "Vendedor: ..."
+- "Observaciones: ..." → si no está vacío, agregalo a notes
+- "Entrega: Retira" / "Entrega: Envio" etc → va en notes como "Entrega: ..."
+- "TOTAL N" (al pie, número grande) → total
+
+Este tipo de documento NO tiene CAE, CUIT, IVA desglosado ni subtotal — dejá esos campos en null. No hay campo de proveedor identificable, dejá "supplier" en null y volcá todo el contexto (Cliente/Vendedor/Entrega) en "notes".
+
+## Respondé ÚNICAMENTE con JSON válido (sin markdown):
+{
+  "invoice_number": "P-0004-00026254",
+  "invoice_type": "Pedido",
+  "supplier": null,
+  "supplier_cuit": null,
+  "invoice_date": "2026-07-27",
+  "cae": null,
+  "cae_expiry": null,
+  "subtotal": null,
+  "iva_amount": null,
+  "total": 1840392.68,
+  "total_units": 235,
+  "item_count": 41,
+  "notes": "Cliente: R6231-SANTIAGO MEDINA (R); Vendedor: 12-CHRISTIAN; Entrega: Retira",
+  "lines": [
+    {
+      "description": "51000-RTO MACH 3 TURBO - X 4 (X PACK)",
+      "sku": "51000",
+      "ean": null,
+      "name": "RTO MACH 3 TURBO - X 4 (X PACK)",
+      "marca": "RTO",
+      "quantity": 12,
+      "unit_price": 9516.00
+    }
+  ]
+}
+
+## Reglas estrictas
+1. Incluí TODOS los productos, uniendo líneas de descripción que envuelven en dos renglones
+2. quantity: el entero antes de "x". unit_price: el primer precio de la línea (con punto decimal)
+3. sku: siempre el código numérico después de "N)". name: la descripción sin el código ni la cantidad
+4. item_count: cantidad total de ítems numerados que contaste
+5. total_units e invoice_date/total: tomalos del pie del documento
+6. Si un campo no aparece, usá null
+7. NO inventes productos que no estén en el documento
+8. NO omitas líneas aunque el documento sea largo`;
+
 type RawParsed = {
   invoice_number?: string;
   invoice_type?: string | null;
@@ -194,9 +267,12 @@ function normalizeDate(value: string | null | undefined): string | undefined {
   return undefined;
 }
 
+export type InvoiceDocType = "doan" | "pedido";
+
 export async function extractInvoiceFromDocument(
   base64: string,
-  mediaType: string
+  mediaType: string,
+  docType: InvoiceDocType = "doan"
 ): Promise<ParsedInvoiceData> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
@@ -240,13 +316,16 @@ export async function extractInvoiceFromDocument(
   const model =
     process.env.ANTHROPIC_MODEL?.trim() || "claude-sonnet-4-6";
 
+  const prompt =
+    docType === "pedido" ? PEDIDO_EXTRACTION_PROMPT : EXTRACTION_PROMPT;
+
   const response = await client.messages.create({
     model,
     max_tokens: 16384,
     messages: [
       {
         role: "user",
-        content: [documentContent, { type: "text", text: EXTRACTION_PROMPT }],
+        content: [documentContent, { type: "text", text: prompt }],
       },
     ],
   });

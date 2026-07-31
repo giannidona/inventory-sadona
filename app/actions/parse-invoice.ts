@@ -1,7 +1,7 @@
 "use server";
 
 import { extractInvoiceFromDocument } from "@/lib/claude-invoice";
-import type { ParsedInvoiceData } from "@/lib/claude-invoice";
+import type { InvoiceDocType, ParsedInvoiceData } from "@/lib/claude-invoice";
 
 type ActionResult<T = void> =
   | { success: true; data: T }
@@ -38,10 +38,13 @@ export async function parseInvoiceDocument(
     };
   }
 
+  const docTypeRaw = formData.get("docType");
+  const docType: InvoiceDocType = docTypeRaw === "pedido" ? "pedido" : "doan";
+
   try {
     const buffer = Buffer.from(await file.arrayBuffer());
     const base64 = buffer.toString("base64");
-    const data = await extractInvoiceFromDocument(base64, file.type);
+    const data = await extractInvoiceFromDocument(base64, file.type, docType);
     return { success: true, data };
   } catch (err) {
     const message =

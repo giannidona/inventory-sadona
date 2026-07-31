@@ -24,10 +24,13 @@ import {
   type DismissedLowStockMap,
 } from "@/lib/low-stock";
 import ProductActionIcons from "@/components/ProductActionIcons";
+import {
+  loadViewPreferences,
+  saveViewPreferences,
+  type SortMode,
+} from "@/lib/view-preferences";
 import type { InventoryItem } from "@/lib/types";
 import { toast } from "sonner";
-
-type SortMode = "name" | "stock-desc" | "stock-asc" | "newest" | "oldest";
 
 type InventoryDashboardProps = {
   title?: string;
@@ -42,8 +45,10 @@ export default function InventoryDashboard({
   const searchParams = useSearchParams();
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [sortMode, setSortMode] = useState<SortMode>("name");
+  const [search, setSearch] = useState(() => loadViewPreferences().search);
+  const [sortMode, setSortMode] = useState<SortMode>(
+    () => loadViewPreferences().sortMode
+  );
   const [lowStockThreshold, setLowStockThreshold] = useState<number>(
     () => loadLowStockThreshold()
   );
@@ -51,7 +56,10 @@ export default function InventoryDashboard({
     String(loadLowStockThreshold())
   );
   const [lowStockOnly, setLowStockOnly] = useState(
-    () => lockToLowStock || searchParams.get("low") === "1"
+    () =>
+      lockToLowStock ||
+      searchParams.get("low") === "1" ||
+      loadViewPreferences().lowStockOnly
   );
   const [dismissed, setDismissed] = useState<DismissedLowStockMap>(() =>
     lockToLowStock ? loadDismissedLowStock() : {}
@@ -96,6 +104,17 @@ export default function InventoryDashboard({
       setThresholdInput(String(value));
     });
   }, []);
+
+  useEffect(() => {
+    saveViewPreferences({ search, sortMode });
+  }, [search, sortMode]);
+
+  useEffect(() => {
+    // On /notifications, lowStockOnly is always forced true — don't let that
+    // overwrite the toggle's saved state on the main inventory page.
+    if (lockToLowStock) return;
+    saveViewPreferences({ lowStockOnly });
+  }, [lowStockOnly, lockToLowStock]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();

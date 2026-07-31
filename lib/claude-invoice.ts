@@ -1,4 +1,5 @@
 import {
+  IVA_RATE,
   normalizeInvoiceLine,
   parseArgentineNumber,
 } from "@/lib/invoice-utils";
@@ -341,5 +342,22 @@ export async function extractInvoiceFromDocument(
     );
   }
 
-  return parseClaudeJson(textBlock.text);
+  const parsed = parseClaudeJson(textBlock.text);
+
+  // El precio unitario en los pedidos viene con IVA incluido; el resto de la
+  // app (stock, inversión, price_changes) asume precio neto, así que lo
+  // convertimos acá antes de devolver los datos.
+  if (docType === "pedido") {
+    parsed.lines = parsed.lines.map((line) =>
+      line.unit_price != null
+        ? { ...line, unit_price: roundCurrency(line.unit_price / (1 + IVA_RATE)) }
+        : line
+    );
+  }
+
+  return parsed;
+}
+
+function roundCurrency(value: number): number {
+  return Math.round(value * 100) / 100;
 }

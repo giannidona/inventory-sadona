@@ -2,6 +2,7 @@ import {
   IVA_RATE,
   normalizeInvoiceLine,
   parseArgentineNumber,
+  type InvoiceDocType,
 } from "@/lib/invoice-utils";
 import type { InvoiceLineInput, ProcessInvoiceInput } from "@/lib/types";
 
@@ -21,21 +22,25 @@ IMPORTANTE: Si el PDF tiene MÚLTIPLES PÁGINAS, leé TODAS las páginas y extra
 ## La tabla de productos puede venir en DOS formatos distintos — fijate cuál es antes de extraer
 
 **Formato A** (columnas: CANTIDAD | DESCRIPCION | P.UNIT. | IVA | IMPORTE):
-- DESCRIPCION: "CODIGO-NOMBRE" donde CODIGO tiene 4 a 6 dígitos → es el SKU interno del mayorista
+- DESCRIPCION: "CODIGO-NOMBRE" (ej: "100054-**FLETE CAPITAL", código corto de 4 a 6 dígitos)
 - CANTIDAD viene como "4,000 Unid" = 4 unidades (la coma y los ceros son decimales de presentación, NO miles)
 - P.UNIT. = precio unitario por unidad, se usa directo
 
 **Formato B**, más nuevo (columnas: DESCRIPCION | P.LISTA | DTO | P.UNIT | UNIDAD | IVA | IMPORTE):
-- DESCRIPCION: "CODIGO-NOMBRE" donde CODIGO tiene 8 dígitos o más (EAN-13/UPC-A, código de barras) → NO es un SKU, es el EAN del producto
+- DESCRIPCION: "CODIGO-NOMBRE" (código largo, 8+ dígitos, tipo EAN-13/UPC-A)
 - UNIDAD viene como número entero simple (ej: "6", "12", "24"), sin ", Unid" — es la cantidad
 - P.LISTA es el precio de lista SIN descuento — IGNORALO
 - P.UNIT es el precio YA con el descuento (DTO) aplicado — ese es el que va en unit_price
-- Esta es la factura de este tipo. Este formato ya NO trae el SKU interno, solo el EAN.
 
-## Cómo clasificar el código antes del guión en DESCRIPCION (en cualquiera de los dos formatos)
-- 4 a 6 dígitos → campo "sku", dejá "ean" en null
-- 8 dígitos o más → campo "ean", dejá "sku" en null
-NUNCA pongas el mismo valor en los dos campos a la vez.
+## Cómo clasificar el código antes del guión en DESCRIPCION — IMPORTANTE
+Este código (sea corto como "100054" o largo como "7798140259435") es SIEMPRE el
+código de producto propio del mayorista (lo tratamos como "ean"), nunca el SKU
+interno de Sadona — este ya no aparece en ninguna factura del mayorista, sin
+importar cuántos dígitos tenga el código.
+- Poné el código completo en el campo "ean"
+- Dejá "sku" SIEMPRE en null (no importa la longitud del código)
+Si una línea no tiene código-guión antes del nombre (raro, pero puede pasar,
+ej: "**FLETE CAPITAL" en algunas facturas), dejá tanto "sku" como "ean" en null.
 
 ## Totales (pie de factura)
 Algunas facturas muestran primero "Total Sin Descuentos" y una sección de "DESCUENTOS /
@@ -64,6 +69,15 @@ Alicuota IVA / Total IVA / Perc.IVA / Importe Total.
   "notes": "observaciones del pie de factura o null",
   "lines": [
     {
+      "description": "100054-**FLETE CAPITAL",
+      "sku": null,
+      "ean": "100054",
+      "name": "**FLETE CAPITAL",
+      "marca": null,
+      "quantity": 1,
+      "unit_price": 8181.82
+    },
+    {
       "description": "7798140259435-ASEPXIA CARBON GEL EXFO x120",
       "sku": null,
       "ean": "7798140259435",
@@ -79,7 +93,7 @@ Alicuota IVA / Total IVA / Perc.IVA / Importe Total.
 1. Incluí TODOS los productos de TODAS las páginas del PDF
 2. quantity: entero positivo. "4,000 Unid" → 4. Número simple como "6" → 6 directo
 3. unit_price: número decimal con punto (convertí de formato argentino). Si hay P.LISTA y P.UNIT, usá SIEMPRE P.UNIT (con descuento), nunca P.LISTA
-4. Código antes del guión en DESCRIPCION: 4-6 dígitos → "sku" (dejando "ean" null), 8+ dígitos → "ean" (dejando "sku" null). Nunca los dos a la vez
+4. Código antes del guión en DESCRIPCION: SIEMPRE va en "ean", sin importar la longitud. "sku" queda SIEMPRE en null — el mayorista no manda el SKU interno de Sadona
 5. name: texto después del guión, sin el código
 6. item_count: cantidad total de líneas/ítems que indica la factura (ej: "Items: 27")
 7. total_units: suma de unidades del pie (ej: "TOTAL UNIDADES: 160")
@@ -187,7 +201,10 @@ type RawParsed = {
   }>;
 };
 
-export function parseClaudeJson(text: string): ParsedInvoiceData {
+export function parseClaudeJson(
+  text: string,
+  docType: InvoiceDocType = "doan"
+): ParsedInvoiceData {
   const cleaned = text
     .replace(/```json\s*/gi, "")
     .replace(/```\s*/g, "")
@@ -203,15 +220,18 @@ export function parseClaudeJson(text: string): ParsedInvoiceData {
 
   const lines: InvoiceLineInput[] = (parsed.lines ?? [])
     .map((l) =>
-      normalizeInvoiceLine({
-        name: l.name ?? "",
-        description: l.description ?? l.name ?? "",
-        sku: l.sku,
-        ean: l.ean,
-        marca: l.marca,
-        quantity: l.quantity,
-        unit_price: l.unit_price,
-      })
+      normalizeInvoiceLine(
+        {
+          name: l.name ?? "",
+          description: l.description ?? l.name ?? "",
+          sku: l.sku,
+          ean: l.ean,
+          marca: l.marca,
+          quantity: l.quantity,
+          unit_price: l.unit_price,
+        },
+        docType
+      )
     )
     .filter((l): l is NonNullable<typeof l> => l !== null);
 
@@ -268,7 +288,7 @@ function normalizeDate(value: string | null | undefined): string | undefined {
   return undefined;
 }
 
-export type InvoiceDocType = "doan" | "pedido";
+export type { InvoiceDocType };
 
 export async function extractInvoiceFromDocument(
   base64: string,
@@ -342,7 +362,7 @@ export async function extractInvoiceFromDocument(
     );
   }
 
-  const parsed = parseClaudeJson(textBlock.text);
+  const parsed = parseClaudeJson(textBlock.text, docType);
 
   // El precio unitario en los pedidos viene con IVA incluido; el resto de la
   // app (stock, inversión, price_changes) asume precio neto, así que lo

@@ -36,15 +36,22 @@ export function parseArgentineQuantity(value: string | number | null | undefined
   return num != null ? Math.round(num) : 0;
 }
 
+export type InvoiceDocType = "doan" | "pedido";
+
 /**
- * Splits doan-style "CODIGO-NOMBRE" descriptions, e.g.:
- *   "23993-ESTRELLA ALGODON CLASICO x75Grs" (SKU interno, 4-6 dígitos)
- *   "7798140259435-ASEPXIA CARBON GEL EXFO x120" (EAN/código de barras, 8+ dígitos)
+ * Splits "CODIGO-NOMBRE" descriptions, e.g.:
+ *   "100054-**FLETE CAPITAL"
+ *   "7798140259435-ASEPXIA CARBON GEL EXFO x120"
  *
- * Las facturas más nuevas del mayorista ya no traen el SKU interno, solo el
- * EAN del producto — por eso el código se clasifica según su longitud.
+ * doan ya no manda el SKU interno de Sadona en sus facturas — el código que
+ * viene antes del guión, sea corto o largo, es siempre su propio código de
+ * producto (lo tratamos como EAN). Los "pedidos" son un documento distinto,
+ * generado con nuestro propio código de mayorista, que sí es un SKU real.
  */
-export function splitProductDescription(description: string): {
+export function splitProductDescription(
+  description: string,
+  docType: InvoiceDocType = "doan"
+): {
   sku?: string;
   ean?: string;
   name: string;
@@ -58,11 +65,10 @@ export function splitProductDescription(description: string): {
   const name = match[2].trim();
   const marca = extractBrandFromName(name);
 
-  // 4-6 dígitos: código interno del mayorista (SKU). 8+ dígitos: EAN-13/UPC-A.
-  if (code.length >= 8) {
-    return { ean: code, name, marca };
+  if (docType === "pedido") {
+    return { sku: code, name, marca };
   }
-  return { sku: code, name, marca };
+  return { ean: code, name, marca };
 }
 
 function extractBrandFromName(name: string): string | undefined {
@@ -73,15 +79,18 @@ function extractBrandFromName(name: string): string | undefined {
   return first;
 }
 
-export function normalizeInvoiceLine(line: {
-  name: string;
-  sku?: string | null;
-  ean?: string | null;
-  marca?: string | null;
-  quantity?: number | string | null;
-  unit_price?: number | string | null;
-  description?: string | null;
-}): {
+export function normalizeInvoiceLine(
+  line: {
+    name: string;
+    sku?: string | null;
+    ean?: string | null;
+    marca?: string | null;
+    quantity?: number | string | null;
+    unit_price?: number | string | null;
+    description?: string | null;
+  },
+  docType: InvoiceDocType = "doan"
+): {
   name: string;
   sku?: string;
   ean?: string;
@@ -95,13 +104,13 @@ export function normalizeInvoiceLine(line: {
   let marca = line.marca?.trim() || undefined;
 
   if (!name && line.description) {
-    const split = splitProductDescription(line.description);
+    const split = splitProductDescription(line.description, docType);
     name = split.name;
     sku = sku || split.sku;
     ean = ean || split.ean;
     marca = marca || split.marca;
   } else if (/^\d{4,14}-/.test(name)) {
-    const split = splitProductDescription(name);
+    const split = splitProductDescription(name, docType);
     name = split.name;
     sku = sku || split.sku;
     ean = ean || split.ean;

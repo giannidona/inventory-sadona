@@ -9,7 +9,14 @@ import {
 import BarcodeScanner from "@/components/BarcodeScanner";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import ShipmentCalendar, { type DayCounts } from "@/components/ShipmentCalendar";
-import { PackageIcon, QrIcon, SearchIcon, TrashIcon } from "@/components/icons";
+import {
+  ExternalLinkIcon,
+  PackageIcon,
+  QrIcon,
+  SearchIcon,
+  TrashIcon,
+} from "@/components/icons";
+import { mercadoLibreSaleUrl } from "@/lib/marketplace-links";
 import type { Courier, Shipment } from "@/lib/types";
 import { toast } from "sonner";
 
@@ -225,6 +232,16 @@ export default function ShipmentsPage() {
                   <span className="flex items-center gap-2 text-xs text-white/50">
                     <CourierBadge courier={s.courier} />
                     {formatShortDate(parseDateKey(s.shipment_date))}
+                    <a
+                      href={mercadoLibreSaleUrl(s.envio_id)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Ver venta en MercadoLibre"
+                      aria-label="Ver venta en MercadoLibre"
+                      className="flex h-7 w-7 items-center justify-center rounded-lg border border-yellow-400/30 text-yellow-400/90 transition-colors hover:bg-yellow-400/10"
+                    >
+                      <ExternalLinkIcon />
+                    </a>
                   </span>
                 </div>
               ))
@@ -379,8 +396,18 @@ export default function ShipmentsPage() {
                           })}
                         </p>
                       </div>
-                      <div className="flex shrink-0 items-center gap-3">
+                      <div className="flex shrink-0 items-center gap-2">
                         <CourierBadge courier={s.courier} />
+                        <a
+                          href={mercadoLibreSaleUrl(s.envio_id)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Ver venta en MercadoLibre"
+                          aria-label="Ver venta en MercadoLibre"
+                          className="flex h-8 w-8 items-center justify-center rounded-lg border border-yellow-400/30 text-yellow-400/90 transition-colors hover:bg-yellow-400/10"
+                        >
+                          <ExternalLinkIcon />
+                        </a>
                         <button
                           type="button"
                           onClick={() => setDeleteTarget(s)}

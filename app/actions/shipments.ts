@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
+import { parseShipmentQr } from "@/lib/shipment-qr";
 import type { Courier, Shipment } from "@/lib/types";
 
 type ActionResult<T = void> =
@@ -11,12 +12,17 @@ type ActionResult<T = void> =
 /** Registers a scanned package under a courier + shipment date. */
 export async function createShipment(
   courier: Courier,
-  packId: string,
+  rawQr: string,
   shipmentDate: string
 ): Promise<ActionResult<Shipment>> {
-  const trimmed = packId.trim().replace(/\s+/g, " ");
+  const trimmed = rawQr.trim();
   if (!trimmed) {
     return { success: false, error: "El código escaneado está vacío" };
+  }
+
+  const parsed = parseShipmentQr(trimmed);
+  if (!parsed.envioId) {
+    return { success: false, error: "No se pudo leer el código escaneado" };
   }
 
   const supabase = createServiceClient();
@@ -25,9 +31,12 @@ export async function createShipment(
     .from("shipments")
     .insert({
       courier,
-      pack_id: trimmed,
+      envio_id: parsed.envioId,
+      sender_id: parsed.senderId,
+      hash_code: parsed.hashCode,
+      security_digit: parsed.securityDigit,
       shipment_date: shipmentDate,
-      raw_qr: trimmed,
+      raw_qr: parsed.raw,
     })
     .select("*")
     .single();
@@ -36,7 +45,7 @@ export async function createShipment(
     if (error.code === "23505") {
       return {
         success: false,
-        error: `Este paquete ya fue escaneado (${trimmed})`,
+        error: `Este envío ya fue escaneado (${parsed.envioId})`,
       };
     }
     return { success: false, error: error.message };

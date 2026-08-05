@@ -127,7 +127,7 @@ export default function ShipmentsPage() {
     const q = search.trim().toLowerCase();
     if (!q) return [];
     return shipments
-      .filter((s) => s.pack_id.toLowerCase().includes(q))
+      .filter((s) => s.envio_id.toLowerCase().includes(q))
       .slice(0, 30);
   }, [shipments, search]);
 
@@ -152,7 +152,7 @@ export default function ShipmentsPage() {
     if (result.success && result.data) {
       const shipment = result.data;
       setShipments((prev) => [shipment, ...prev]);
-      toast.success(`${courier}: paquete escaneado (${shipment.pack_id})`);
+      toast.success(`${courier}: envío escaneado (#${shipment.envio_id})`);
     } else if (!result.success) {
       toast.error(result.error);
     }
@@ -195,7 +195,7 @@ export default function ShipmentsPage() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar pedido por Pack ID..."
+            placeholder="Buscar por N° de envío..."
             className="w-full bg-transparent text-sm text-white placeholder:text-white/30 focus:outline-none"
           />
           {search && (
@@ -217,9 +217,11 @@ export default function ShipmentsPage() {
               searchResults.map((s) => (
                 <div
                   key={s.id}
-                  className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm"
+                  className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm"
                 >
-                  <span className="font-mono text-white/80">{s.pack_id}</span>
+                  <span className="font-mono text-white/80">
+                    #{s.envio_id}
+                  </span>
                   <span className="flex items-center gap-2 text-xs text-white/50">
                     <CourierBadge courier={s.courier} />
                     {formatShortDate(parseDateKey(s.shipment_date))}
@@ -274,7 +276,7 @@ export default function ShipmentsPage() {
 
           <div className="space-y-6">
             <div className="glass-card p-4 sm:p-5">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h3 className="text-sm font-semibold capitalize text-white">
                     {formatLongDate(selectedDate)}
@@ -286,7 +288,7 @@ export default function ShipmentsPage() {
                   </p>
                 </div>
 
-                <div className="inline-flex rounded-xl border border-white/10 p-1">
+                <div className="inline-flex self-start rounded-xl border border-white/10 p-1 sm:self-auto">
                   {COURIERS.map((c) => (
                     <button
                       key={c}
@@ -357,12 +359,19 @@ export default function ShipmentsPage() {
                   {dayShipments.map((s) => (
                     <li
                       key={s.id}
-                      className="flex items-center justify-between gap-3 px-4 py-3"
+                      className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-3"
                     >
                       <div className="min-w-0">
-                        <p className="truncate font-mono text-sm text-white/80">
-                          {s.pack_id}
-                        </p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="truncate font-mono text-sm font-medium text-white/90">
+                            #{s.envio_id}
+                          </p>
+                          {s.security_digit && (
+                            <span className="shrink-0 rounded-md bg-white/5 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-white/50">
+                              Díg. {s.security_digit}
+                            </span>
+                          )}
+                        </div>
                         <p className="mt-0.5 text-xs text-white/30">
                           {new Date(s.created_at).toLocaleTimeString("es-AR", {
                             hour: "2-digit",
@@ -394,7 +403,7 @@ export default function ShipmentsPage() {
       <ConfirmDialog
         open={!!deleteTarget}
         title="Eliminar escaneo"
-        message={`¿Eliminar el paquete ${deleteTarget?.pack_id} de ${deleteTarget?.courier}?`}
+        message={`¿Eliminar el envío #${deleteTarget?.envio_id} de ${deleteTarget?.courier}?`}
         onConfirm={handleDelete}
         onCancel={() => setDeleteTarget(null)}
       />

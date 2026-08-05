@@ -94,11 +94,15 @@ create index if not exists price_changes_created_at_idx
   on price_changes (created_at desc);
 
 -- Tracks packages handed off to delivery couriers (cadeterías), scanned from
--- the QR on each Mercado Envíos label. One row per package/pack_id.
+-- the QR on each Mercado Envíos label. The QR decodes to a JSON blob whose
+-- "id" field is the envío/shipment number — that's what envio_id stores.
 create table shipments (
   id uuid primary key default gen_random_uuid(),
   courier text not null check (courier in ('Express', 'FuneFlex')),
-  pack_id text not null,
+  envio_id text not null,
+  sender_id text,
+  hash_code text,
+  security_digit text,
   shipment_date date not null,
   raw_qr text,
   created_at timestamptz default now()
@@ -111,8 +115,8 @@ create policy "Allow anon read on shipments"
   to anon
   using (true);
 
-create unique index if not exists shipments_pack_id_idx
-  on shipments (pack_id);
+create unique index if not exists shipments_envio_id_idx
+  on shipments (envio_id);
 
 create index if not exists shipments_shipment_date_idx
   on shipments (shipment_date);

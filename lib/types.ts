@@ -102,7 +102,10 @@ export type Courier = "Express" | "FuneFlex";
 export type Shipment = {
   id: string;
   courier: Courier;
-  pack_id: string;
+  envio_id: string;
+  sender_id: string | null;
+  hash_code: string | null;
+  security_digit: string | null;
   shipment_date: string;
   raw_qr: string | null;
   created_at: string;

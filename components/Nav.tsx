@@ -66,6 +66,7 @@ export default function Nav() {
     { href: "/price-changes", label: "Precios" },
     { href: "/notifications", label: "Notificaciones", badge: lowStockCount },
     { href: "/statistics", label: "Estadísticas" },
+    { href: "/shipments", label: "Envíos" },
     { href: "/add", label: "Agregar" },
   ];
 

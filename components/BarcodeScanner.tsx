@@ -9,21 +9,36 @@ type BarcodeScannerProps = {
   active: boolean;
   onScan: (ean: string) => void;
   onError?: (message: string) => void;
+  /**
+   * Keeps the camera running and re-arms scanning after every hit instead of
+   * stopping at the first one — for batch workflows like scanning a stack of
+   * shipping labels one after another. Repeats of the same code within a
+   * short window are ignored so holding a label in frame doesn't fire twice.
+   */
+  continuous?: boolean;
 };
+
+const REPEAT_GUARD_MS = 2500;
 
 export default function BarcodeScanner({
   active,
   onScan,
   onError,
+  continuous = false,
 }: BarcodeScannerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const controlsRef = useRef<ScannerControls | null>(null);
   const scanningRef = useRef(false);
   const onScanRef = useRef(onScan);
   const onErrorRef = useRef(onError);
+  const continuousRef = useRef(continuous);
+  const lastResultRef = useRef<{ text: string; at: number } | null>(null);
 
-  onScanRef.current = onScan;
-  onErrorRef.current = onError;
+  useEffect(() => {
+    onScanRef.current = onScan;
+    onErrorRef.current = onError;
+    continuousRef.current = continuous;
+  }, [onScan, onError, continuous]);
 
   const stopScanner = useCallback(() => {
     scanningRef.current = false;
@@ -34,6 +49,7 @@ export default function BarcodeScanner({
   const startScanner = useCallback(async () => {
     stopScanner();
     scanningRef.current = true;
+    lastResultRef.current = null;
 
     try {
       const reader = new BrowserMultiFormatReader();
@@ -52,9 +68,22 @@ export default function BarcodeScanner({
         videoRef.current!,
         (result) => {
           if (!scanningRef.current || !result) return;
+          const text = result.getText();
+
+          if (continuousRef.current) {
+            const now = Date.now();
+            const last = lastResultRef.current;
+            if (last && last.text === text && now - last.at < REPEAT_GUARD_MS) {
+              return;
+            }
+            lastResultRef.current = { text, at: now };
+            onScanRef.current(text);
+            return;
+          }
+
           scanningRef.current = false;
           controlsRef.current?.stop();
-          onScanRef.current(result.getText());
+          onScanRef.current(text);
         }
       );
 

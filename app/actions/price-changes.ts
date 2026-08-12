@@ -7,7 +7,7 @@ export async function getPriceChanges() {
 
   const { data, error } = await supabase
     .from("price_changes")
-    .select("*, invoices(invoice_number)")
+    .select("*, invoices(invoice_number), inventory:inventory_id(ean, stock)")
     .order("created_at", { ascending: false });
 
   if (error) {

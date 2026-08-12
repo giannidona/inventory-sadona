@@ -135,4 +135,5 @@ export type PriceChange = {
   new_price: number;
   created_at: string;
   invoices?: { invoice_number: string } | null;
+  inventory?: { ean: string | null; stock: number } | null;
 };

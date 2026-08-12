@@ -138,6 +138,13 @@ export async function processInvoice(
     .single();
 
   if (invoiceError || !invoice) {
+    if (invoiceError?.code === "23505") {
+      return {
+        success: false,
+        error:
+          "Ya existe una factura guardada con ese CAE. Si tu proveedor usa CAEA (compartido entre varias facturas), corré la migración 008_drop_cae_unique.sql en Supabase.",
+      };
+    }
     return {
       success: false,
       error: invoiceError?.message ?? "Error al guardar la factura",

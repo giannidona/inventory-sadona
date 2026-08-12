@@ -80,12 +80,26 @@ export async function processInvoice(
 
   const supabase = createServiceClient();
 
-  if (input.cae?.trim()) {
-    const { data: existing } = await supabase
+  // Dedupe by invoice_number (+ supplier, when known) instead of CAE: some
+  // distribuidoras (Dai Nippon) print a CAEA, which is requested in advance
+  // for a whole batch of invoices and is IDENTICAL across many of them —
+  // using it for duplicate-detection would wrongly flag every invoice in
+  // that batch as a repeat of the first one uploaded. invoice_number is
+  // always unique per physical invoice, which is what we actually care about.
+  {
+    const invoiceNumber = input.invoice_number.trim();
+    const supplierTrimmed = input.supplier?.trim();
+
+    let dedupeQuery = supabase
       .from("invoices")
       .select("id, invoice_number")
-      .eq("cae", input.cae.trim())
-      .maybeSingle();
+      .eq("invoice_number", invoiceNumber);
+
+    if (supplierTrimmed) {
+      dedupeQuery = dedupeQuery.eq("supplier", supplierTrimmed);
+    }
+
+    const { data: existing } = await dedupeQuery.maybeSingle();
 
     if (existing) {
       return {

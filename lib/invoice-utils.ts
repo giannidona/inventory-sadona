@@ -117,6 +117,12 @@ export function normalizeInvoiceLine(
     marca = marca || split.marca;
   }
 
+  // Defensive cleanup: some formats (Nippon) have a packaging token ("UNI",
+  // "1x1", "1x6"...) sitting right before the real name — strip it if the
+  // model left it stuck on, regardless of doc type.
+  name = name.replace(/^(?:UNI|UN|UNID)\b[\s.:-]*/i, "").trim();
+  name = name.replace(/^\d+\s*[xX]\s*\d+\b[\s.:-]*/, "").trim();
+
   const quantity = parseArgentineQuantity(line.quantity ?? 0);
   const unit_price = parseArgentineNumber(line.unit_price ?? undefined);
 
@@ -124,10 +130,12 @@ export function normalizeInvoiceLine(
 
   return {
     name,
-    // Doan/Nippon never carry a real Sadona SKU — show the EAN in that field
-    // right away (not just at save time) so it's visible/editable in the
-    // review modal instead of showing up blank.
-    sku: sku || ean,
+    // The EAN is always the real product identifier once it's known — never
+    // trust a distributor's own internal code (CODIGO) as our SKU, even if
+    // the model slipped it into "sku" by mistake. Only fall back to
+    // whatever "sku" came through (e.g. a real pedido SKU) when there's no
+    // EAN at all.
+    sku: ean || sku,
     ean,
     marca: marca || extractBrandFromName(name),
     quantity,

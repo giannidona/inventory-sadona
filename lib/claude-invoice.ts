@@ -190,21 +190,36 @@ IMPORTANTE — PÁGINAS DUPLICADAS: Estas facturas casi siempre traen la MISMA f
 - Vencimiento CAE: al lado de "Fecha de Vto." (formato DD/MM/YY) — usalo como "cae_expiry"
 
 ## Tabla de productos (columnas: CODIGO | CANTIDAD | DESCRIPCION | EAN13 | P.UNIT.S/IVA | DESCUENTOS | TOTAL)
-- CODIGO: IGNORALO POR COMPLETO. No es el SKU de Sadona, no lo uses para nada. El campo "sku" queda SIEMPRE en null.
-- EAN13: es el ÚNICO código de producto que importa. Va siempre en el campo "ean" (a veces tiene menos de 13 dígitos, igual usalo tal cual aparece)
-- DESCRIPCION: va directo al campo "name", tal cual — ya viene limpia, sin ningún código pegado adelante
+La línea cruda se ve así (columnas separadas por espacios, sin ningún separador visual entre CANTIDAD, el empaque y DESCRIPCION):
+
+  337060351   3   1x1   IDI LAB.BARRA ULTRA HD 251-SIENA   77960498   5358,47   16075,42
+  ↑CODIGO     ↑CANT ↑empaque  ↑DESCRIPCION (nombre real)              ↑EAN13    ↑P.UNIT.S/IVA
+
+- CODIGO (primer número de la línea, ej "337060351"): IGNORALO POR COMPLETO. NUNCA lo pongas en "sku" ni en ningún otro campo. No es el SKU de Sadona. El campo "sku" del JSON queda SIEMPRE en null, sin excepción — aunque te "parezca" un código de producto válido, no lo es acá.
+- EAN13 (el número que aparece DESPUÉS de la descripción, justo antes del precio, ej "77960498"): es el ÚNICO código de producto que importa. Va siempre en el campo "ean" (a veces tiene menos de 13 dígitos, igual usalo tal cual aparece)
+- DESCRIPCION: el texto entre el empaque (1x1/UNI/etc) y el EAN13. Va al campo "name" — SIN el empaque pegado adelante (ver sección siguiente)
 - P.UNIT.S/IVA: precio unitario, YA SIN IVA — usalo directo en "unit_price", no hace falta convertir ni restar nada
 - Hay una línea "FLETE" al final de la tabla con 0,00 en todo — IGNORALA, no es un producto
 
-## CANTIDAD — ojo, esto requiere un cálculo
-La cantidad real a cargar en stock es la columna CANTIDAD multiplicada por el "empaque" que aparece justo al lado, en la misma celda. El empaque puede venir como:
+## CANTIDAD y empaque — ojo, esto requiere un cálculo Y una limpieza de texto
+Entre CANTIDAD y DESCRIPCION hay un tercer valor pegado, el "empaque" ("UNI", "1x1", "1x6", etc). Este empaque:
+1. Se usa para calcular la cantidad real (ver fórmula abajo)
+2. NO ES PARTE DEL NOMBRE DEL PRODUCTO — nunca lo incluyas en "name" ni en "description". El nombre empieza en la palabra siguiente al empaque.
+
+Cálculo de cantidad real = CANTIDAD × multiplicador del empaque:
 - "UNI" → sin multiplicador, la cantidad real es CANTIDAD tal cual
 - "AxB" (ej: "1x1", "1x6") → multiplicá CANTIDAD × A × B
 
-Ejemplos reales de esta factura:
-- "3   1x1   IDI LAB.BARRA ULTRA HD 251-SIENA" → cantidad real = 3 × 1 × 1 = 3
-- "1   1x6   RISQUE ESM. DESEJO" → cantidad real = 1 × 1 × 6 = 6
-- "4   UNI   RISQUE ESM. CARMIM" → cantidad real = 4 (sin multiplicador)
+Ejemplo completo con la línea de arriba ("337060351   3   1x1   IDI LAB.BARRA ULTRA HD 251-SIENA   77960498   5358,47   16075,42"):
+- sku: null (el 337060351 NUNCA va acá)
+- ean: "77960498"
+- quantity: 3 × 1 × 1 = 3
+- name: "IDI LAB.BARRA ULTRA HD 251-SIENA"  ← CORRECTO, sin "1x1" adelante
+- name INCORRECTO (no hagas esto): "1x1 IDI LAB.BARRA ULTRA HD 251-SIENA"  ← el empaque quedó pegado, está mal
+
+Más ejemplos de cálculo de cantidad:
+- "1   1x6   RISQUE ESM. DESEJO" → cantidad real = 1 × 1 × 6 = 6, name = "RISQUE ESM. DESEJO"
+- "4   UNI   RISQUE ESM. CARMIM" → cantidad real = 4 (sin multiplicador), name = "RISQUE ESM. CARMIM"
 
 El campo "quantity" del JSON tiene que ser SIEMPRE el resultado YA MULTIPLICADO (el entero final que va a stock), nunca el número crudo de la columna CANTIDAD. Para verificar que el cálculo está bien: quantity × unit_price tiene que dar aproximadamente el valor de la columna TOTAL de esa línea.
 
@@ -253,12 +268,14 @@ El campo "quantity" del JSON tiene que ser SIEMPRE el resultado YA MULTIPLICADO 
 
 ## Reglas estrictas
 1. Incluí TODOS los productos, pero SOLO UNA VEZ cada uno — si la factura está duplicada en el PDF (copia Original + Duplicado), no repitas los productos
-2. sku: SIEMPRE null. ean: SIEMPRE el valor de la columna EAN13
-3. quantity: el resultado de CANTIDAD × multiplicador de empaque (ver arriba), como número entero final
-4. unit_price: la columna P.UNIT.S/IVA, tal cual (ya está sin IVA)
-5. No incluyas la línea "FLETE" como producto
-6. Si un campo no aparece, usá null
-7. NO inventes productos que no estén en la factura`;
+2. sku: SIEMPRE null, en las 34+ líneas de la factura, sin ninguna excepción. El CODIGO (primer número de cada línea) NUNCA va en "sku" ni en ningún campo
+3. ean: SIEMPRE el valor de la columna EAN13 (el número que está justo antes del precio, no el CODIGO)
+4. name: NUNCA debe empezar con "1x1", "UNI", "1x6" ni ningún otro texto de empaque — revisá cada nombre antes de responder y sacá ese prefijo si quedó pegado
+5. quantity: el resultado de CANTIDAD × multiplicador de empaque (ver arriba), como número entero final
+6. unit_price: la columna P.UNIT.S/IVA, tal cual (ya está sin IVA)
+7. No incluyas la línea "FLETE" como producto
+8. Si un campo no aparece, usá null
+9. NO inventes productos que no estén en la factura`;
 
 type RawParsed = {
   invoice_number?: string;

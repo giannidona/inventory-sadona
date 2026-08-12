@@ -111,6 +111,20 @@ export type Shipment = {
   created_at: string;
 };
 
+export type StockArrival = {
+  id: string;
+  invoice_id: string | null;
+  inventory_id: string | null;
+  product_name: string;
+  sku: string | null;
+  ean: string | null;
+  quantity_added: number;
+  new_stock: number;
+  unit_price: number | null;
+  created_at: string;
+  invoices?: { invoice_number: string } | null;
+};
+
 export type PriceChange = {
   id: string;
   invoice_id: string | null;

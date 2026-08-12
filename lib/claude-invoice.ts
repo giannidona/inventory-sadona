@@ -176,6 +176,90 @@ Este tipo de documento NO tiene CAE, CUIT, IVA desglosado ni subtotal — dejá 
 7. NO inventes productos que no estén en el documento
 8. NO omitas líneas aunque el documento sea largo`;
 
+const NIPPON_EXTRACTION_PROMPT = `Sos un extractor de facturas de la distribuidora "Dai Nippon S.A.", un mayorista de cosmética con un formato de factura particular.
+
+IMPORTANTE — PÁGINAS DUPLICADAS: Estas facturas casi siempre traen la MISMA factura impresa dos veces en el mismo PDF (una copia "Original" y otra "Duplicado", idénticas letra por letra, cada una ocupando 1 o 2 páginas). Fijate si el número de factura, el CAE/CAEA y los productos de una página coinciden exactamente con los de una página anterior — si es así, es una copia duplicada: NO la vuelvas a contar. Extraé la tabla de productos UNA SOLA VEZ, de la primera copia legible del documento.
+
+## Encabezado
+- Proveedor: "Dai Nippon S.A."
+- Número de factura: aparece junto a "FACTURA", algo como "0015-00699013" (formato XXXX-XXXXXXXX)
+- Tipo de factura: la letra grande en un recuadro (A, B, etc.)
+- CUIT del proveedor: al lado de "CUIT:"
+- Fecha: al lado de "FECHA:", formato DD/MM/YYYY
+- CAE: aparece como "CAEA" seguido de un número largo (ej: "CAEA 86305546115375") — usalo como "cae"
+- Vencimiento CAE: al lado de "Fecha de Vto." (formato DD/MM/YY) — usalo como "cae_expiry"
+
+## Tabla de productos (columnas: CODIGO | CANTIDAD | DESCRIPCION | EAN13 | P.UNIT.S/IVA | DESCUENTOS | TOTAL)
+- CODIGO: IGNORALO POR COMPLETO. No es el SKU de Sadona, no lo uses para nada. El campo "sku" queda SIEMPRE en null.
+- EAN13: es el ÚNICO código de producto que importa. Va siempre en el campo "ean" (a veces tiene menos de 13 dígitos, igual usalo tal cual aparece)
+- DESCRIPCION: va directo al campo "name", tal cual — ya viene limpia, sin ningún código pegado adelante
+- P.UNIT.S/IVA: precio unitario, YA SIN IVA — usalo directo en "unit_price", no hace falta convertir ni restar nada
+- Hay una línea "FLETE" al final de la tabla con 0,00 en todo — IGNORALA, no es un producto
+
+## CANTIDAD — ojo, esto requiere un cálculo
+La cantidad real a cargar en stock es la columna CANTIDAD multiplicada por el "empaque" que aparece justo al lado, en la misma celda. El empaque puede venir como:
+- "UNI" → sin multiplicador, la cantidad real es CANTIDAD tal cual
+- "AxB" (ej: "1x1", "1x6") → multiplicá CANTIDAD × A × B
+
+Ejemplos reales de esta factura:
+- "3   1x1   IDI LAB.BARRA ULTRA HD 251-SIENA" → cantidad real = 3 × 1 × 1 = 3
+- "1   1x6   RISQUE ESM. DESEJO" → cantidad real = 1 × 1 × 6 = 6
+- "4   UNI   RISQUE ESM. CARMIM" → cantidad real = 4 (sin multiplicador)
+
+El campo "quantity" del JSON tiene que ser SIEMPRE el resultado YA MULTIPLICADO (el entero final que va a stock), nunca el número crudo de la columna CANTIDAD. Para verificar que el cálculo está bien: quantity × unit_price tiene que dar aproximadamente el valor de la columna TOTAL de esa línea.
+
+## Totales (pie de factura)
+- subtotal = "SubTotal" / "SUB-TOTAL"
+- iva_amount = el monto que se suma al subtotal para llegar al total (en esta factura aparece como "P.Iva RG5329 21% <monto>", el nombre puede variar)
+- total = el TOTAL final (subtotal + iva_amount)
+- Esta factura no siempre trae total de unidades ni cantidad de ítems explícitos — si no aparecen, dejá total_units e item_count en null
+
+## Respondé ÚNICAMENTE con JSON válido (sin markdown):
+{
+  "invoice_number": "0015-00699013",
+  "invoice_type": "A",
+  "supplier": "Dai Nippon S.A.",
+  "supplier_cuit": "30644206463",
+  "invoice_date": "2026-08-11",
+  "cae": "86305546115375",
+  "cae_expiry": "2026-08-15",
+  "subtotal": 411560.72,
+  "iva_amount": 86427.75,
+  "total": 497988.47,
+  "total_units": null,
+  "item_count": null,
+  "notes": null,
+  "lines": [
+    {
+      "description": "IDI LAB.BARRA ULTRA HD 251-SIENA",
+      "sku": null,
+      "ean": "77960498",
+      "name": "IDI LAB.BARRA ULTRA HD 251-SIENA",
+      "marca": "IDI",
+      "quantity": 3,
+      "unit_price": 5358.47
+    },
+    {
+      "description": "RISQUE ESM. DESEJO",
+      "sku": null,
+      "ean": "7891182030915",
+      "name": "RISQUE ESM. DESEJO",
+      "marca": "RISQUE",
+      "quantity": 6,
+      "unit_price": 1713.42
+    }
+  ]
+}
+
+## Reglas estrictas
+1. Incluí TODOS los productos, pero SOLO UNA VEZ cada uno — si la factura está duplicada en el PDF (copia Original + Duplicado), no repitas los productos
+2. sku: SIEMPRE null. ean: SIEMPRE el valor de la columna EAN13
+3. quantity: el resultado de CANTIDAD × multiplicador de empaque (ver arriba), como número entero final
+4. unit_price: la columna P.UNIT.S/IVA, tal cual (ya está sin IVA)
+5. No incluyas la línea "FLETE" como producto
+6. Si un campo no aparece, usá null
+7. NO inventes productos que no estén en la factura`;
+
 type RawParsed = {
   invoice_number?: string;
   invoice_type?: string | null;
@@ -338,7 +422,11 @@ export async function extractInvoiceFromDocument(
     process.env.ANTHROPIC_MODEL?.trim() || "claude-sonnet-4-6";
 
   const prompt =
-    docType === "pedido" ? PEDIDO_EXTRACTION_PROMPT : EXTRACTION_PROMPT;
+    docType === "pedido"
+      ? PEDIDO_EXTRACTION_PROMPT
+      : docType === "nippon"
+        ? NIPPON_EXTRACTION_PROMPT
+        : EXTRACTION_PROMPT;
 
   const response = await client.messages.create({
     model,

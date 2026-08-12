@@ -20,7 +20,7 @@ async function findProduct(
   if (line.sku?.trim()) {
     const { data } = await supabase
       .from("inventory")
-      .select("id, stock, name, sku, unit_price")
+      .select("id, stock, name, sku, ean, unit_price")
       .eq("sku", line.sku.trim())
       .maybeSingle();
     if (data) return data;
@@ -29,7 +29,7 @@ async function findProduct(
   if (line.ean?.trim()) {
     const { data } = await supabase
       .from("inventory")
-      .select("id, stock, name, sku, unit_price")
+      .select("id, stock, name, sku, ean, unit_price")
       .eq("ean", line.ean.trim())
       .maybeSingle();
     if (data) return data;
@@ -37,7 +37,7 @@ async function findProduct(
 
   const { data } = await supabase
     .from("inventory")
-    .select("id, stock, name, sku, unit_price")
+    .select("id, stock, name, sku, ean, unit_price")
     .ilike("name", line.name.trim())
     .maybeSingle();
 
@@ -144,7 +144,10 @@ export async function processInvoice(
     let priceChangeInfo: { old_price: number; new_price: number } | undefined;
 
     if (!product) {
-      const sku = line.sku?.trim() || generateSku(line.name);
+      // Doan/Nippon invoices never carry a real Sadona SKU — fall back to
+      // the EAN (a real, searchable code) before generating a synthetic one.
+      const sku =
+        line.sku?.trim() || line.ean?.trim() || generateSku(line.name);
       const { data: newProduct, error: createError } = await supabase
         .from("inventory")
         .insert({
@@ -155,7 +158,7 @@ export async function processInvoice(
           stock: line.quantity,
           unit_price: line.unit_price ?? null,
         })
-        .select("id, stock, name, sku, unit_price")
+        .select("id, stock, name, sku, ean, unit_price")
         .single();
 
       if (createError || !newProduct) {
@@ -240,6 +243,19 @@ export async function processInvoice(
       unit_price: line.unit_price ?? null,
     });
 
+    // Separate log of everything that came in on this invoice, so stock can
+    // be synced to other sales channels without reopening the invoice.
+    await supabase.from("stock_arrivals").insert({
+      invoice_id: invoice.id,
+      inventory_id: product.id,
+      product_name: line.name.trim(),
+      sku: product.sku,
+      ean: product.ean ?? line.ean?.trim() ?? null,
+      quantity_added: line.quantity,
+      new_stock: product.stock,
+      unit_price: line.unit_price ?? product.unit_price ?? null,
+    });
+
     results.push({
       product_name: line.name.trim(),
       action,
@@ -252,6 +268,7 @@ export async function processInvoice(
   revalidatePath("/invoices");
   revalidatePath("/scan");
   revalidatePath("/price-changes");
+  revalidatePath("/stock-arrivals");
 
   return {
     success: true,

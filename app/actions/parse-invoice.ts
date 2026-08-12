@@ -39,7 +39,12 @@ export async function parseInvoiceDocument(
   }
 
   const docTypeRaw = formData.get("docType");
-  const docType: InvoiceDocType = docTypeRaw === "pedido" ? "pedido" : "doan";
+  const docType: InvoiceDocType =
+    docTypeRaw === "pedido"
+      ? "pedido"
+      : docTypeRaw === "nippon"
+        ? "nippon"
+        : "doan";
 
   try {
     const buffer = Buffer.from(await file.arrayBuffer());

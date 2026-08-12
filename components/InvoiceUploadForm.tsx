@@ -13,7 +13,7 @@ import type { InvoiceLineInput, ProcessInvoiceInput } from "@/lib/types";
 import { toast } from "sonner";
 
 type LineRow = InvoiceLineInput & { key: string };
-type DocType = "doan" | "pedido";
+type DocType = "doan" | "pedido" | "nippon";
 
 function emptyLine(): LineRow {
   return {
@@ -236,6 +236,17 @@ export default function InvoiceUploadForm() {
                 }`}
               >
                 Pedido
+              </button>
+              <button
+                type="button"
+                onClick={() => setDocType("nippon")}
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  docType === "nippon"
+                    ? "bg-[#E0457B] text-white"
+                    : "text-white/60 hover:text-white"
+                }`}
+              >
+                Factura Nippon
               </button>
             </div>
           </div>

@@ -36,7 +36,7 @@ export function parseArgentineQuantity(value: string | number | null | undefined
   return num != null ? Math.round(num) : 0;
 }
 
-export type InvoiceDocType = "doan" | "pedido";
+export type InvoiceDocType = "doan" | "pedido" | "nippon";
 
 /**
  * Splits "CODIGO-NOMBRE" descriptions, e.g.:

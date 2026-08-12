@@ -65,6 +65,7 @@ export default function Nav() {
     { href: "/invoices", label: "Facturas" },
     { href: "/price-changes", label: "Precios" },
     { href: "/notifications", label: "Notificaciones", badge: lowStockCount },
+    { href: "/stock-arrivals", label: "Ingresos" },
     { href: "/statistics", label: "Estadísticas" },
     { href: "/shipments", label: "Envíos" },
     { href: "/add", label: "Agregar" },

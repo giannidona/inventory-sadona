@@ -124,7 +124,10 @@ export function normalizeInvoiceLine(
 
   return {
     name,
-    sku,
+    // Doan/Nippon never carry a real Sadona SKU — show the EAN in that field
+    // right away (not just at save time) so it's visible/editable in the
+    // review modal instead of showing up blank.
+    sku: sku || ean,
     ean,
     marca: marca || extractBrandFromName(name),
     quantity,

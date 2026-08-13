@@ -107,6 +107,9 @@ create table stock_arrivals (
   quantity_added int not null,
   new_stock int not null,
   unit_price numeric(12, 2),
+  -- true when this row came from creating a brand-new product (vs.
+  -- restocking one that already existed) — powers /new-products.
+  is_new boolean not null default false,
   created_at timestamptz default now()
 );
 
@@ -122,6 +125,9 @@ create index if not exists stock_arrivals_inventory_id_idx
 
 create index if not exists stock_arrivals_created_at_idx
   on stock_arrivals (created_at desc);
+
+create index if not exists stock_arrivals_is_new_idx
+  on stock_arrivals (is_new);
 
 -- Tracks packages handed off to delivery couriers (cadeterías), scanned from
 -- the QR on each Mercado Envíos label. The QR decodes to a JSON blob whose

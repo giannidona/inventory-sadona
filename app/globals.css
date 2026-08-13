@@ -29,7 +29,11 @@ body {
   }
 
   /* Fluid page width: scales with the viewport instead of a fixed cap,
-     so wide monitors get more room while narrow screens stay full-width. */
+     so wide monitors get more room while narrow screens stay full-width.
+     w-full always resolves against the actual parent (the <main> column
+     next to the sidebar on desktop), so this stays correct even though
+     max-w's vw component is measured against the full viewport — it only
+     ever acts as a ceiling, never forces overflow past the sidebar. */
   .page-container {
     @apply mx-auto w-full max-w-[min(1600px,95vw)];
   }

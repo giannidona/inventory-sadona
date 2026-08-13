@@ -113,6 +113,18 @@ export default function InvoiceUploadForm() {
         `Factura guardada: ${created} creado${created !== 1 ? "s" : ""}, ${updated} actualizado${updated !== 1 ? "s" : ""}`
       );
 
+      if (created > 0) {
+        toast.info(
+          `${created} producto${created !== 1 ? "s" : ""} nuevo${created !== 1 ? "s" : ""} creado${created !== 1 ? "s" : ""}`,
+          {
+            action: {
+              label: "Ver productos nuevos",
+              onClick: () => router.push("/new-products"),
+            },
+          }
+        );
+      }
+
       if (price_changes > 0) {
         toast.warning(
           `${price_changes} producto${price_changes !== 1 ? "s" : ""} con precio distinto al que tenías`,

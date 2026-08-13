@@ -275,6 +275,7 @@ export async function processInvoice(
       quantity_added: line.quantity,
       new_stock: product.stock,
       unit_price: line.unit_price ?? product.unit_price ?? null,
+      is_new: action === "created",
     });
 
     results.push({

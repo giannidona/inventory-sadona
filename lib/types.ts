@@ -121,6 +121,7 @@ export type StockArrival = {
   quantity_added: number;
   new_stock: number;
   unit_price: number | null;
+  is_new: boolean;
   created_at: string;
   invoices?: { invoice_number: string } | null;
 };

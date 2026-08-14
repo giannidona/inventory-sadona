@@ -555,6 +555,7 @@ export default function InventoryDashboard({
                       <td className="px-4 py-3">
                         <ProductActionIcons
                           sku={item.sku}
+                          ean={item.ean}
                           onEdit={() => setEditProduct(item)}
                           onHistory={() => setHistoryProduct(item)}
                           onDelete={() => setDeleteTarget(item)}
@@ -614,6 +615,7 @@ export default function InventoryDashboard({
                   />
                   <ProductActionIcons
                     sku={item.sku}
+                    ean={item.ean}
                     onEdit={() => setEditProduct(item)}
                     onHistory={() => setHistoryProduct(item)}
                     onDelete={() => setDeleteTarget(item)}

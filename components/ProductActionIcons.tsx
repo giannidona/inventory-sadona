@@ -1,6 +1,6 @@
 "use client";
 
-import { doanProductUrl, mercadoLibreSearchUrl } from "@/lib/marketplace-links";
+import { doanSearchUrl, mercadoLibreSearchUrl } from "@/lib/marketplace-links";
 import {
   ExternalLinkIcon,
   HistoryIcon,
@@ -11,6 +11,7 @@ import {
 
 type ProductActionIconsProps = {
   sku: string;
+  ean?: string | null;
   onEdit: () => void;
   onHistory: () => void;
   onDelete: () => void;
@@ -24,6 +25,7 @@ const baseIconButton =
 // any screen size (desktop table, tablet, or mobile cards).
 export default function ProductActionIcons({
   sku,
+  ean,
   onEdit,
   onHistory,
   onDelete,
@@ -31,7 +33,7 @@ export default function ProductActionIcons({
   return (
     <div className="inline-grid grid-cols-3 gap-1.5">
       <a
-        href={doanProductUrl(sku)}
+        href={doanSearchUrl(ean || sku)}
         target="_blank"
         rel="noopener noreferrer"
         title="Ver en Doan"

@@ -1,7 +1,7 @@
 // External marketplace links, built from a product's SKU.
 
-export function doanProductUrl(sku: string): string {
-  return `https://doan.com.ar/index.php?route=product/product&product_id=${encodeURIComponent(sku)}`;
+export function doanSearchUrl(ean: string): string {
+  return `https://doan.com.ar/index.php?route=product/search&search=${encodeURIComponent(ean)}`;
 }
 
 export function mercadoLibreSearchUrl(sku: string): string {

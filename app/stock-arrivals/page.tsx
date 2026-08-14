@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { getStockArrivals } from "@/app/actions/stock-arrivals";
-import { doanProductUrl, mercadoLibreSearchUrl } from "@/lib/marketplace-links";
+import { doanSearchUrl, mercadoLibreSearchUrl } from "@/lib/marketplace-links";
 import { ExternalLinkIcon, ShoppingBagIcon } from "@/components/icons";
 import { loadDismissedIds, saveDismissedIds } from "@/lib/dismissed-ids";
 import type { StockArrival } from "@/lib/types";
@@ -181,9 +181,9 @@ export default function StockArrivalsPage() {
                         {new Date(arrival.created_at).toLocaleDateString("es-AR")}
                       </td>
                       <td className="px-4 py-3">
-                        {arrival.sku ? (
+                        {arrival.ean || arrival.sku ? (
                           <a
-                            href={doanProductUrl(arrival.sku)}
+                            href={doanSearchUrl(arrival.ean ?? arrival.sku ?? "")}
                             target="_blank"
                             rel="noopener noreferrer"
                             title="Ver en Doan"
@@ -244,10 +244,10 @@ export default function StockArrivalsPage() {
                         {arrival.sku ?? "—"}
                         {arrival.ean && ` · ${arrival.ean}`}
                       </p>
-                      {arrival.sku && (
+                      {(arrival.ean || arrival.sku) && (
                         <div className="flex items-center gap-1.5">
                           <a
-                            href={doanProductUrl(arrival.sku)}
+                            href={doanSearchUrl(arrival.ean ?? arrival.sku ?? "")}
                             target="_blank"
                             rel="noopener noreferrer"
                             title="Ver en Doan"
@@ -257,7 +257,7 @@ export default function StockArrivalsPage() {
                             <ExternalLinkIcon />
                           </a>
                           <a
-                            href={mercadoLibreSearchUrl(arrival.sku)}
+                            href={mercadoLibreSearchUrl(arrival.sku ?? arrival.ean ?? "")}
                             target="_blank"
                             rel="noopener noreferrer"
                             title="Ver en MercadoLibre"

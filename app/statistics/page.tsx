@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { getTopMovedProducts } from "@/app/actions/stats";
 import { formatPrice } from "@/lib/invoice-utils";
-import { doanProductUrl, mercadoLibreSearchUrl } from "@/lib/marketplace-links";
+import { doanSearchUrl, mercadoLibreSearchUrl } from "@/lib/marketplace-links";
 import { ExternalLinkIcon, ShoppingBagIcon, TrendingUpIcon } from "@/components/icons";
 import type { ProductStat } from "@/app/actions/stats";
 import { toast } from "sonner";
@@ -175,7 +175,7 @@ export default function StatisticsPage() {
                       </td>
                       <td className="px-4 py-3">
                         <a
-                          href={doanProductUrl(item.sku)}
+                          href={doanSearchUrl(item.ean ?? item.sku)}
                           target="_blank"
                           rel="noopener noreferrer"
                           title="Ver en Doan"
@@ -225,7 +225,7 @@ export default function StatisticsPage() {
                   </div>
                   <div className="flex shrink-0 items-center gap-1.5">
                     <a
-                      href={doanProductUrl(item.sku)}
+                      href={doanSearchUrl(item.ean ?? item.sku)}
                       target="_blank"
                       rel="noopener noreferrer"
                       title="Ver en Doan"

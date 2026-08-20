@@ -121,6 +121,10 @@ export type StockArrival = {
   quantity_added: number;
   new_stock: number;
   unit_price: number | null;
+  // Populated when this same invoice line also changed the product's price
+  // (joined from price_changes by invoice_id + inventory_id) — null when the
+  // price stayed the same, in which case unit_price is just shown as-is.
+  old_price: number | null;
   is_new: boolean;
   created_at: string;
   invoices?: { invoice_number: string } | null;

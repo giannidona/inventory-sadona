@@ -130,8 +130,8 @@ export default function InvoiceUploadForm() {
           `${price_changes} producto${price_changes !== 1 ? "s" : ""} con precio distinto al que tenías`,
           {
             action: {
-              label: "Ver cambios",
-              onClick: () => router.push("/price-changes"),
+              label: "Ver ingresos",
+              onClick: () => router.push("/stock-arrivals"),
             },
           }
         );

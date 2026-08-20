@@ -19,7 +19,6 @@ import {
   PlusCircleIcon,
   ReceiptIcon,
   SparklesIcon,
-  TagIcon,
   TrendingUpIcon,
 } from "@/components/icons";
 
@@ -100,7 +99,6 @@ export default function Sidebar() {
   const links: NavLink[] = [
     { href: "/", label: "Inventario", icon: GridIcon },
     { href: "/invoices", label: "Facturas", icon: ReceiptIcon },
-    { href: "/price-changes", label: "Precios", icon: TagIcon },
     {
       href: "/notifications",
       label: "Notificaciones",

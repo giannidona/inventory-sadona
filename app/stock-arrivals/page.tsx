@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { getStockArrivals } from "@/app/actions/stock-arrivals";
+import { formatPrice } from "@/lib/invoice-utils";
 import { doanSearchUrl, mercadoLibreSearchUrl } from "@/lib/marketplace-links";
 import { ExternalLinkIcon, ShoppingBagIcon } from "@/components/icons";
 import { loadDismissedIds, saveDismissedIds } from "@/lib/dismissed-ids";
@@ -90,8 +91,9 @@ export default function StockArrivalsPage() {
         </div>
         <p className="mt-1 text-sm text-white/50">
           Todo lo que entró por factura, para actualizar el stock en otras
-          plataformas sin tener que volver a abrir la factura. Marcá cada uno
-          como listo (✕) una vez que lo actualizaste afuera.
+          plataformas sin tener que volver a abrir la factura. Si el precio
+          vino distinto al que ya tenías, se muestra acá mismo. Marcá cada
+          uno como listo (✕) una vez que lo actualizaste afuera.
         </p>
       </div>
 
@@ -117,13 +119,14 @@ export default function StockArrivalsPage() {
           {/* Desktop table */}
           <div className="glass-card hidden overflow-hidden md:block">
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px] text-sm">
+              <table className="w-full min-w-[1000px] text-sm">
                 <thead>
                   <tr className="border-b border-white/10 text-left text-white/50">
                     <th className="px-4 py-3 font-medium">Producto</th>
                     <th className="px-4 py-3 font-medium">SKU</th>
                     <th className="px-4 py-3 font-medium">EAN</th>
                     <th className="px-4 py-3 font-medium">Ingresó</th>
+                    <th className="px-4 py-3 font-medium">Precio</th>
                     <th className="px-4 py-3 font-medium">Stock actual</th>
                     <th className="px-4 py-3 font-medium">Factura</th>
                     <th className="px-4 py-3 font-medium">Fecha</th>
@@ -161,6 +164,9 @@ export default function StockArrivalsPage() {
                         <span className="inline-flex items-center rounded-lg bg-green-500/10 px-2 py-1 text-xs font-semibold tabular-nums text-green-400">
                           +{arrival.quantity_added}
                         </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <PriceCell arrival={arrival} />
                       </td>
                       <td className="px-4 py-3 font-semibold tabular-nums text-white">
                         {arrival.new_stock}
@@ -274,11 +280,14 @@ export default function StockArrivalsPage() {
                     +{arrival.quantity_added}
                   </span>
                 </div>
-                <div className="mt-3 flex items-center gap-2 text-sm">
-                  <span className="text-white/40">Stock actual:</span>
-                  <span className="font-semibold tabular-nums text-white">
-                    {arrival.new_stock}
-                  </span>
+                <div className="mt-3 flex items-center justify-between text-sm">
+                  <PriceCell arrival={arrival} />
+                  <div className="flex items-center gap-2">
+                    <span className="text-white/40">Stock actual:</span>
+                    <span className="font-semibold tabular-nums text-white">
+                      {arrival.new_stock}
+                    </span>
+                  </div>
                 </div>
                 <div className="mt-2 flex items-center justify-between text-xs text-white/40">
                   {arrival.invoice_id ? (
@@ -301,5 +310,60 @@ export default function StockArrivalsPage() {
         </>
       )}
     </div>
+  );
+}
+
+// Shows just the current price when it didn't change on this invoice, or an
+// old→new comparison with a delta badge when it did (same info the old
+// "Cambios de precio" tab showed, now inline on the arrival it came from).
+function PriceCell({ arrival }: { arrival: StockArrival }) {
+  if (arrival.unit_price == null) {
+    return <span className="text-white/30">—</span>;
+  }
+
+  if (arrival.old_price == null) {
+    return (
+      <span className="font-medium text-white">
+        {formatPrice(arrival.unit_price)}
+      </span>
+    );
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="text-white/40 line-through decoration-white/30">
+        {formatPrice(arrival.old_price)}
+      </span>
+      <span className="font-medium text-white">
+        {formatPrice(arrival.unit_price)}
+      </span>
+      <PriceDelta oldPrice={arrival.old_price} newPrice={arrival.unit_price} />
+    </div>
+  );
+}
+
+function PriceDelta({
+  oldPrice,
+  newPrice,
+}: {
+  oldPrice: number;
+  newPrice: number;
+}) {
+  const diff = newPrice - oldPrice;
+  const pct = oldPrice !== 0 ? (diff / oldPrice) * 100 : 0;
+  const increased = diff > 0;
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold tabular-nums ${
+        increased
+          ? "bg-red-500/10 text-red-400"
+          : "bg-green-500/10 text-green-400"
+      }`}
+    >
+      {increased ? "▲" : "▼"} {formatPrice(Math.abs(diff))} (
+      {increased ? "+" : "−"}
+      {Math.abs(pct).toFixed(1)}%)
+    </span>
   );
 }

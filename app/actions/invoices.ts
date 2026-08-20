@@ -289,7 +289,6 @@ export async function processInvoice(
   revalidatePath("/");
   revalidatePath("/invoices");
   revalidatePath("/scan");
-  revalidatePath("/price-changes");
   revalidatePath("/stock-arrivals");
 
   return {

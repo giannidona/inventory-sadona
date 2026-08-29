@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { doanSearchUrl, mercadoLibreSearchUrl } from "@/lib/marketplace-links";
 import {
   ExternalLinkIcon,
@@ -22,11 +23,19 @@ type ProductActionIconsProps = {
 const baseIconButton =
   "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border transition-colors";
 
+const MENU_WIDTH = 176; // px, matches w-44
+const MENU_HEIGHT_ESTIMATE = 140;
+
+type MenuPosition = { top: number; left: number };
+
 // Only the two links (Doan/ML) stay as always-visible icon buttons — the
-// rest live behind a "⋮" menu. Squeezing 5 fixed-size buttons into one
-// table cell or mobile card made them nearly impossible to tap accurately
-// on smaller screens, since a 3-col grid doesn't get any more room to
-// breathe there than it does on a wide desktop.
+// rest live behind a "⋮" menu, rendered through a portal into <body> with
+// fixed positioning. The table row sits inside an overflow-x-auto wrapper
+// (which per the CSS spec forces overflow-y to auto too) plus a
+// overflow-hidden glass-card, so an absolutely-positioned menu nested
+// inside the row got clipped instead of floating free — a portal escapes
+// both ancestors entirely, so the menu always renders in full regardless
+// of scroll position or which row it's on.
 export default function ProductActionIcons({
   sku,
   ean,
@@ -35,18 +44,21 @@ export default function ProductActionIcons({
   onDelete,
 }: ProductActionIconsProps) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [openUpward, setOpenUpward] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const [menuPos, setMenuPos] = useState<MenuPosition | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  function computePosition(): MenuPosition {
+    const rect = triggerRef.current!.getBoundingClientRect();
+    const openUpward = rect.bottom + MENU_HEIGHT_ESTIMATE > window.innerHeight;
+    return {
+      top: openUpward ? rect.top - MENU_HEIGHT_ESTIMATE : rect.bottom + 4,
+      left: Math.max(8, rect.right - MENU_WIDTH),
+    };
+  }
 
   function toggleMenu() {
-    if (!menuOpen && containerRef.current) {
-      // Flip the menu above the button when there isn't room below — matters
-      // most for rows near the bottom of the table, where the card's own
-      // overflow-hidden would otherwise clip it.
-      const rect = containerRef.current.getBoundingClientRect();
-      const approxMenuHeight = 140;
-      setOpenUpward(rect.bottom + approxMenuHeight > window.innerHeight);
-    }
+    if (!menuOpen) setMenuPos(computePosition());
     setMenuOpen((prev) => !prev);
   }
 
@@ -54,19 +66,32 @@ export default function ProductActionIcons({
     if (!menuOpen) return;
 
     function handlePointerDown(e: MouseEvent) {
-      if (!containerRef.current?.contains(e.target as Node)) {
+      if (
+        !triggerRef.current?.contains(e.target as Node) &&
+        !menuRef.current?.contains(e.target as Node)
+      ) {
         setMenuOpen(false);
       }
     }
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") setMenuOpen(false);
     }
+    // Any scroll (including inside the table's own overflow-x-auto wrapper)
+    // would leave the fixed-position menu floating over the wrong row, so
+    // just close it — matches how most native dropdowns behave on scroll.
+    function handleScroll() {
+      setMenuOpen(false);
+    }
 
     document.addEventListener("mousedown", handlePointerDown);
     document.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("scroll", handleScroll, true);
+    window.addEventListener("resize", handleScroll);
     return () => {
       document.removeEventListener("mousedown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("scroll", handleScroll, true);
+      window.removeEventListener("resize", handleScroll);
     };
   }, [menuOpen]);
 
@@ -76,7 +101,7 @@ export default function ProductActionIcons({
   }
 
   return (
-    <div ref={containerRef} className="relative inline-flex items-center gap-1.5">
+    <div className="inline-flex items-center gap-1.5">
       <a
         href={doanSearchUrl(ean || sku)}
         target="_blank"
@@ -98,6 +123,7 @@ export default function ProductActionIcons({
         <ShoppingBagIcon />
       </a>
       <button
+        ref={triggerRef}
         type="button"
         onClick={toggleMenu}
         title="Más acciones"
@@ -113,42 +139,45 @@ export default function ProductActionIcons({
         <MoreVerticalIcon />
       </button>
 
-      {menuOpen && (
-        <div
-          role="menu"
-          className={`absolute right-0 z-20 w-44 overflow-hidden rounded-xl border border-white/10 bg-[#1a1a1a] shadow-2xl ${
-            openUpward ? "bottom-[calc(100%+4px)]" : "top-[calc(100%+4px)]"
-          }`}
-        >
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => runAndClose(onHistory)}
-            className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm text-white/70 transition-colors hover:bg-white/5 hover:text-white"
+      {menuOpen &&
+        menuPos &&
+        createPortal(
+          <div
+            ref={menuRef}
+            role="menu"
+            style={{ top: menuPos.top, left: menuPos.left, width: MENU_WIDTH }}
+            className="fixed z-50 overflow-hidden rounded-xl border border-white/10 bg-[#1a1a1a] shadow-2xl"
           >
-            <HistoryIcon />
-            Ver historial
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => runAndClose(onEdit)}
-            className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm text-white/70 transition-colors hover:bg-white/5 hover:text-white"
-          >
-            <PencilIcon />
-            Editar
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => runAndClose(onDelete)}
-            className="flex w-full items-center gap-2.5 border-t border-white/10 px-3 py-2.5 text-left text-sm text-red-400/90 transition-colors hover:bg-red-500/10 hover:text-red-400"
-          >
-            <TrashIcon />
-            Eliminar
-          </button>
-        </div>
-      )}
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => runAndClose(onHistory)}
+              className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm text-white/70 transition-colors hover:bg-white/5 hover:text-white"
+            >
+              <HistoryIcon />
+              Ver historial
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => runAndClose(onEdit)}
+              className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm text-white/70 transition-colors hover:bg-white/5 hover:text-white"
+            >
+              <PencilIcon />
+              Editar
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => runAndClose(onDelete)}
+              className="flex w-full items-center gap-2.5 border-t border-white/10 px-3 py-2.5 text-left text-sm text-red-400/90 transition-colors hover:bg-red-500/10 hover:text-red-400"
+            >
+              <TrashIcon />
+              Eliminar
+            </button>
+          </div>,
+          document.body
+        )}
     </div>
   );
 }

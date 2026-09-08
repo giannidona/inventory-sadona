@@ -56,6 +56,7 @@ function EditProductForm({
   const [sku, setSku] = useState(product.sku);
   const [ean, setEan] = useState(product.ean ?? "");
   const [marca, setMarca] = useState(product.marca ?? "");
+  const [supplier, setSupplier] = useState(product.supplier ?? "");
   const [unitPrice, setUnitPrice] = useState(
     product.unit_price != null ? String(product.unit_price) : ""
   );
@@ -70,6 +71,7 @@ function EditProductForm({
       sku,
       ean: ean || undefined,
       marca: marca || undefined,
+      supplier: supplier || undefined,
       unit_price: unitPrice ? parseFloat(unitPrice) : undefined,
     });
 
@@ -114,6 +116,14 @@ function EditProductForm({
           value={marca}
           onChange={(e) => setMarca(e.target.value)}
           className="input"
+        />
+      </Field>
+      <Field label="Proveedor">
+        <input
+          value={supplier}
+          onChange={(e) => setSupplier(e.target.value)}
+          className="input"
+          placeholder="Ej: Doan, QPoint..."
         />
       </Field>
       <Field label="Precio unitario">

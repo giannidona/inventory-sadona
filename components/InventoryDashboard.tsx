@@ -512,7 +512,7 @@ export default function InventoryDashboard({
           {/* Desktop table */}
           <div className="glass-card hidden overflow-hidden md:block">
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px] text-sm">
+              <table className="w-full min-w-[1050px] text-sm">
                 <thead>
                   <tr className="border-b border-white/10 text-left text-white/50">
                     <th className="px-4 py-3 font-medium">Nombre</th>
@@ -546,6 +546,7 @@ export default function InventoryDashboard({
                     <th className="px-4 py-3 font-medium">Precio</th>
                     <th className="px-4 py-3 font-medium">Inversión</th>
                     <th className="px-4 py-3 font-medium">Marca</th>
+                    <th className="px-4 py-3 font-medium">Proveedor</th>
                     <th className="px-4 py-3 font-medium">Acciones</th>
                   </tr>
                 </thead>
@@ -594,6 +595,9 @@ export default function InventoryDashboard({
                       <td className="px-4 py-3 text-white/60">
                         {item.marca ?? "—"}
                       </td>
+                      <td className="px-4 py-3 text-white/60">
+                        {item.supplier ?? "—"}
+                      </td>
                       <td className="px-4 py-3">
                         <ProductActionIcons
                           sku={item.sku}
@@ -634,8 +638,10 @@ export default function InventoryDashboard({
                       {item.sku}
                       {item.ean && ` · ${item.ean}`}
                     </p>
-                    {item.marca && (
-                      <p className="mt-1 text-xs text-white/40">{item.marca}</p>
+                    {(item.marca || item.supplier) && (
+                      <p className="mt-1 text-xs text-white/40">
+                        {[item.marca, item.supplier].filter(Boolean).join(" · ")}
+                      </p>
                     )}
                     <p className="mt-1 text-xs text-white/50">
                       {formatPrice(item.unit_price)}

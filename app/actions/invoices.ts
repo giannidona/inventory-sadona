@@ -176,6 +176,7 @@ export async function processInvoice(
           sku,
           ean: line.ean?.trim() || null,
           marca: line.marca?.trim() || null,
+          supplier: input.supplier?.trim() || null,
           stock: line.quantity,
           unit_price: line.unit_price ?? null,
         })
@@ -213,6 +214,13 @@ export async function processInvoice(
 
       if (line.unit_price != null) {
         updateData.unit_price = line.unit_price;
+      }
+
+      // Keep the product's "last bought from" in sync with whichever
+      // invoice most recently restocked it — but don't blank out a known
+      // supplier just because this particular invoice left the field empty.
+      if (input.supplier?.trim()) {
+        updateData.supplier = input.supplier.trim();
       }
 
       const { error: updateError } = await supabase

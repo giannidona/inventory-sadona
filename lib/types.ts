@@ -6,6 +6,9 @@ export type InventoryItem = {
   stock: number;
   marca: string | null;
   unit_price: number | null;
+  // Last supplier this product was bought from (e.g. "Doan", "QPoint"),
+  // kept in sync automatically from the supplier of its most recent invoice.
+  supplier: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -24,6 +27,7 @@ export type ProductFormData = {
   ean?: string;
   stock?: number;
   marca?: string;
+  supplier?: string;
   unit_price?: number;
 };
 

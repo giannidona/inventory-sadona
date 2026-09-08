@@ -6,6 +6,9 @@ create table inventory (
   stock int not null default 0,
   marca text,
   unit_price numeric(12, 2),
+  -- Where this product was last bought from (Doan, QPoint, etc.) — kept in
+  -- sync with the supplier of whichever invoice most recently restocked it.
+  supplier text,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );

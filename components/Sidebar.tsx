@@ -6,8 +6,10 @@ import { usePathname } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import {
   loadDismissedLowStock,
+  loadDismissedOutOfStock,
   loadLowStockThreshold,
   onDismissedLowStockChange,
+  onDismissedOutOfStockChange,
   onLowStockThresholdChange,
 } from "@/lib/low-stock";
 import {
@@ -16,6 +18,7 @@ import {
   InboxIcon,
   MenuIcon,
   PackageIcon,
+  PackageXIcon,
   PlusCircleIcon,
   ReceiptIcon,
   SparklesIcon,
@@ -43,6 +46,7 @@ const Logo = ({ onClick }: { onClick?: () => void }) => (
 export default function Sidebar() {
   const pathname = usePathname();
   const [lowStockCount, setLowStockCount] = useState<number | null>(null);
+  const [outOfStockCount, setOutOfStockCount] = useState<number | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   // Close the mobile drawer whenever the route changes (covers back/forward
   // navigation, not just link clicks) — adjusted during render instead of
@@ -96,6 +100,43 @@ export default function Sidebar() {
     };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchCount() {
+      const supabase = createBrowserClient();
+      const { data, error } = await supabase
+        .from("inventory")
+        .select("id, stock")
+        .eq("stock", 0);
+
+      if (cancelled || error) return;
+
+      const dismissed = loadDismissedOutOfStock();
+      const visible = (data ?? []).filter(
+        (item) => dismissed[item.id] !== item.stock
+      );
+      setOutOfStockCount(visible.length);
+    }
+
+    fetchCount();
+    const interval = setInterval(fetchCount, POLL_MS);
+
+    function onFocus() {
+      fetchCount();
+    }
+    window.addEventListener("focus", onFocus);
+
+    const unsubscribeDismissed = onDismissedOutOfStockChange(fetchCount);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+      unsubscribeDismissed();
+    };
+  }, []);
+
   const links: NavLink[] = [
     { href: "/", label: "Inventario", icon: GridIcon },
     { href: "/invoices", label: "Facturas", icon: ReceiptIcon },
@@ -104,6 +145,12 @@ export default function Sidebar() {
       label: "Notificaciones",
       icon: BellIcon,
       badge: lowStockCount,
+    },
+    {
+      href: "/out-of-stock",
+      label: "Sin stock",
+      icon: PackageXIcon,
+      badge: outOfStockCount,
     },
     { href: "/new-products", label: "Productos nuevos", icon: SparklesIcon },
     { href: "/stock-arrivals", label: "Ingresos", icon: InboxIcon },

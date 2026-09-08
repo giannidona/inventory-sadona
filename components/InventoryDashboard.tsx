@@ -17,9 +17,11 @@ import {
 } from "@/lib/invoice-utils";
 import {
   loadDismissedLowStock,
+  loadDismissedOutOfStock,
   loadLowStockThreshold,
   onLowStockThresholdChange,
   saveDismissedLowStock,
+  saveDismissedOutOfStock,
   saveLowStockThreshold,
   type DismissedLowStockMap,
 } from "@/lib/low-stock";
@@ -36,12 +38,19 @@ type InventoryDashboardProps = {
   title?: string;
   /** Locks the view to only show low-stock products (used by /notifications). */
   lockToLowStock?: boolean;
+  /** Locks the view to only show products with stock === 0 (used by /out-of-stock). */
+  lockToOutOfStock?: boolean;
 };
 
 export default function InventoryDashboard({
   title = "Inventario",
   lockToLowStock = false,
+  lockToOutOfStock = false,
 }: InventoryDashboardProps) {
+  // Both modes lock the page to one filtered, non-search view with per-item
+  // dismiss — they only disagree on the filter predicate and which
+  // dismissed-list storage key backs them.
+  const locked = lockToLowStock || lockToOutOfStock;
   const searchParams = useSearchParams();
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,7 +71,11 @@ export default function InventoryDashboard({
       loadViewPreferences().lowStockOnly
   );
   const [dismissed, setDismissed] = useState<DismissedLowStockMap>(() =>
-    lockToLowStock ? loadDismissedLowStock() : {}
+    lockToOutOfStock
+      ? loadDismissedOutOfStock()
+      : lockToLowStock
+        ? loadDismissedLowStock()
+        : {}
   );
   const [editProduct, setEditProduct] = useState<InventoryItem | null>(null);
   const [historyProduct, setHistoryProduct] = useState<InventoryItem | null>(null);
@@ -110,11 +123,12 @@ export default function InventoryDashboard({
   }, [search, sortMode]);
 
   useEffect(() => {
-    // On /notifications, lowStockOnly is always forced true — don't let that
-    // overwrite the toggle's saved state on the main inventory page.
-    if (lockToLowStock) return;
+    // On /notifications and /out-of-stock, lowStockOnly is either forced or
+    // irrelevant — don't let that overwrite the toggle's saved state on the
+    // main inventory page.
+    if (locked) return;
     saveViewPreferences({ lowStockOnly });
-  }, [lowStockOnly, lockToLowStock]);
+  }, [lowStockOnly, locked]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -127,11 +141,13 @@ export default function InventoryDashboard({
             (item.ean?.toLowerCase().includes(q) ?? false)
         );
 
-    if (lowStockOnly) {
+    if (lockToOutOfStock) {
+      list = list.filter((item) => item.stock === 0);
+    } else if (lowStockOnly) {
       list = list.filter((item) => item.stock <= lowStockThreshold);
     }
 
-    if (lockToLowStock) {
+    if (locked) {
       list = list.filter((item) => dismissed[item.id] !== item.stock);
     }
 
@@ -151,6 +167,19 @@ export default function InventoryDashboard({
       });
     }
 
+    // Default order for a low-stock view: the moment a product's stock last
+    // changed is (in practice) the moment it dropped into low-stock/out-of-
+    // -stock territory, so sorting by updated_at oldest-first lists them in
+    // the order they actually ran out — a queue to work through — instead
+    // of alphabetically, which tells you nothing about what to prioritize.
+    // An explicit Stock/Recientes sort (handled above) still overrides this.
+    if (lowStockOnly || lockToOutOfStock) {
+      return [...list].sort(
+        (a, b) =>
+          new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime()
+      );
+    }
+
     return list;
   }, [
     items,
@@ -158,7 +187,8 @@ export default function InventoryDashboard({
     sortMode,
     lowStockOnly,
     lowStockThreshold,
-    lockToLowStock,
+    lockToOutOfStock,
+    locked,
     dismissed,
   ]);
 
@@ -192,10 +222,14 @@ export default function InventoryDashboard({
 
   const thresholdChanged = thresholdInput !== String(lowStockThreshold);
 
+  const persistDismissed = lockToOutOfStock
+    ? saveDismissedOutOfStock
+    : saveDismissedLowStock;
+
   function dismissItem(id: string, stock: number) {
     setDismissed((prev) => {
       const next = { ...prev, [id]: stock };
-      saveDismissedLowStock(next);
+      persistDismissed(next);
       return next;
     });
   }
@@ -205,10 +239,10 @@ export default function InventoryDashboard({
     setDismissed((prev) => {
       const next = { ...prev };
       for (const item of filtered) next[item.id] = item.stock;
-      saveDismissedLowStock(next);
+      persistDismissed(next);
       return next;
     });
-    toast.success("Notificaciones borradas");
+    toast.success(lockToOutOfStock ? "Lista de sin stock borrada" : "Notificaciones borradas");
   }
 
   const totalInvestment = useMemo(
@@ -296,15 +330,15 @@ export default function InventoryDashboard({
                 <span
                   className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#E0457B]/20 px-1.5 text-[11px] font-bold tabular-nums text-[#E0457B]"
                   title={
-                    search.trim() || lockToLowStock
+                    search.trim() || locked
                       ? `${filtered.length} de ${items.length} productos`
                       : `${items.length} productos`
                   }
                 >
-                  {search.trim() || lockToLowStock ? filtered.length : items.length}
+                  {search.trim() || locked ? filtered.length : items.length}
                 </span>
               )}
-              {lockToLowStock && !loading && filtered.length > 0 && (
+              {locked && !loading && filtered.length > 0 && (
                 <button
                   type="button"
                   onClick={dismissAll}
@@ -316,7 +350,13 @@ export default function InventoryDashboard({
             </div>
             {lockToLowStock ? (
               <p className="mt-1 text-sm text-white/50">
-                Productos con stock igual o menor al umbral de alerta.
+                Productos con stock igual o menor al umbral de alerta, en el
+                orden en que se fueron quedando sin stock.
+              </p>
+            ) : lockToOutOfStock ? (
+              <p className="mt-1 text-sm text-white/50">
+                Productos con stock 0, en el orden en que se fueron quedando
+                sin stock.
               </p>
             ) : (
               !loading &&
@@ -339,7 +379,7 @@ export default function InventoryDashboard({
               onChange={(e) => setSearch(e.target.value)}
               className="input w-full sm:max-w-md"
             />
-            {!lockToLowStock && lowStockCount > 0 && (
+            {!locked && lowStockCount > 0 && (
               <button
                 type="button"
                 onClick={() => setLowStockOnly((v) => !v)}
@@ -405,7 +445,7 @@ export default function InventoryDashboard({
           </div>
         )}
 
-        {!lockToLowStock && (
+        {!locked && (
           <div className="flex flex-col gap-3">
             {cameraActive ? (
               <button
@@ -463,7 +503,9 @@ export default function InventoryDashboard({
             ? "No se encontraron productos"
             : lockToLowStock
               ? "Ningún producto está con stock bajo ahora mismo"
-              : "No hay productos en el inventario"}
+              : lockToOutOfStock
+                ? "Ningún producto está sin stock ahora mismo"
+                : "No hay productos en el inventario"}
         </div>
       ) : (
         <>
@@ -516,12 +558,12 @@ export default function InventoryDashboard({
                       <td className="px-4 py-3 font-medium text-white">
                         <div className="flex items-center gap-2">
                           <span>{item.name}</span>
-                          {lockToLowStock && (
+                          {locked && (
                             <button
                               type="button"
                               onClick={() => dismissItem(item.id, item.stock)}
-                              title="Quitar de notificaciones"
-                              aria-label="Quitar de notificaciones"
+                              title="Quitar de la lista"
+                              aria-label="Quitar de la lista"
                               className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-white/30 transition-colors hover:bg-white/10 hover:text-white"
                             >
                               ✕

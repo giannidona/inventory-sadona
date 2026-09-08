@@ -74,3 +74,35 @@ export function onDismissedLowStockChange(handler: () => void): () => void {
   window.addEventListener(DISMISSED_EVENT, handler);
   return () => window.removeEventListener(DISMISSED_EVENT, handler);
 }
+
+// Products dismissed from the "Sin stock" list — kept in its own storage
+// key so dismissing something there doesn't affect the (separate)
+// low-stock notifications list, even though both reuse the same
+// id -> stock-at-dismissal shape.
+const DISMISSED_OUT_OF_STOCK_KEY = "sadona:dismissedOutOfStock";
+const DISMISSED_OUT_OF_STOCK_EVENT = "sadona:out-of-stock-dismissed-changed";
+
+export function loadDismissedOutOfStock(): DismissedLowStockMap {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(DISMISSED_OUT_OF_STOCK_KEY);
+    return raw ? (JSON.parse(raw) as DismissedLowStockMap) : {};
+  } catch {
+    return {};
+  }
+}
+
+export function saveDismissedOutOfStock(map: DismissedLowStockMap): void {
+  try {
+    window.localStorage.setItem(DISMISSED_OUT_OF_STOCK_KEY, JSON.stringify(map));
+    window.dispatchEvent(new Event(DISMISSED_OUT_OF_STOCK_EVENT));
+  } catch {
+    // ignore storage errors (private mode, quota, etc.)
+  }
+}
+
+/** Notifies other components in the same tab when the dismissed list changes. */
+export function onDismissedOutOfStockChange(handler: () => void): () => void {
+  window.addEventListener(DISMISSED_OUT_OF_STOCK_EVENT, handler);
+  return () => window.removeEventListener(DISMISSED_OUT_OF_STOCK_EVENT, handler);
+}

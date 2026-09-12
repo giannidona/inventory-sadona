@@ -277,6 +277,70 @@ El campo "quantity" del JSON tiene que ser SIEMPRE el resultado YA MULTIPLICADO 
 8. Si un campo no aparece, usá null
 9. NO inventes productos que no estén en la factura`;
 
+const GENERIC_EXTRACTION_PROMPT = `Sos un extractor universal de facturas y comprobantes de compra argentinos — el formato puede ser CUALQUIERA: factura A, B o C, de un mayorista o de un comercio minorista, ticket de farmacia, factura de venta web, etc. No asumas ningún layout fijo: fijate en el documento real que tenés adelante y adaptate.
+
+IMPORTANTE: Si el documento tiene MÚLTIPLES PÁGINAS, leé TODAS y extraé TODOS los ítems de la tabla de productos. No omitas ninguna línea.
+
+## Qué extraer del encabezado
+- Proveedor: la Razón Social de quien EMITE la factura (busca "Razón Social:", "Emisor", o el nombre grande arriba de todo)
+- CUIT del proveedor
+- Número de factura/comprobante (Punto de Venta + Comp.Nro., o cualquier numeración que use el documento)
+- Tipo de factura (A, B, C, ticket, etc.)
+- Fecha de emisión
+- CAE / CAEA y su vencimiento, si aparecen
+- Subtotal, IVA y Total, si el documento los discrimina en el pie
+
+## Tabla de productos
+Cada línea trae normalmente: un código de producto (puede ser un EAN13 de barras, o un código interno corto del proveedor), nombre/descripción, cantidad y precio unitario (a veces también %descuento y subtotal de línea).
+- Poné el código de producto SIEMPRE en el campo "ean" (sea el código que sea, corto o largo, EAN real o código interno) — nunca completes un "sku" separado, dejalo en null
+- Si una línea no tiene código de producto y es un cargo de envío/flete (ej. "ENVIO A DOMICILIO", "FLETE") NO la incluyas como producto — no es mercadería
+- name: copiá el texto tal cual está impreso en la factura, sin expandir abreviaturas ni "corregir" nada
+- unit_price: el precio unitario TAL CUAL aparece impreso en esa línea — no le restes ni le sumes IVA vos, eso lo hace otro paso del sistema después
+
+## Precios con IVA incluido o no — el campo más importante, pensalo bien
+Fijate si el precio de cada línea YA INCLUYE el IVA o no:
+- Es una venta MINORISTA / a "CONSUMIDOR FINAL" con precios finales de venta (señales: "Condición de IVA: CONSUMIDOR FINAL", o una leyenda tipo "REGIMEN DE TRANSPARENCIA FISCAL AL CONSUMIDOR" / "IVA contenido") → los precios de la tabla YA TIENEN el IVA adentro → "prices_include_iva": true
+- Es una factura A, o una factura a un Responsable Inscripto con IVA discriminado aparte en el pie (SubTotal + IVA = Total, como líneas separadas, y los precios de la tabla coinciden con el SubTotal) → los precios de la tabla son netos, sin IVA → "prices_include_iva": false
+Regla práctica si tenés dudas: sumá cantidad × precio de todas las líneas. Si ese total coincide con el Total final de la factura, los precios YA incluyen IVA (true). Si ese total coincide con el Subtotal (y hay que sumarle el IVA aparte para llegar al Total), los precios son netos (false).
+
+## Respondé ÚNICAMENTE con JSON válido (sin markdown):
+{
+  "invoice_number": "0010-00292624",
+  "invoice_type": "B",
+  "supplier": "FARMACIA SIANO - SIANO SILVIA GRACIELA",
+  "supplier_cuit": "27-17263320-5",
+  "invoice_date": "2026-09-04",
+  "cae": "86361568388096",
+  "cae_expiry": "2026-09-14",
+  "subtotal": 187656.01,
+  "iva_amount": 32568.40,
+  "total": 187656.01,
+  "total_units": 15,
+  "item_count": 6,
+  "prices_include_iva": true,
+  "notes": null,
+  "lines": [
+    {
+      "ean": "7509552920932",
+      "name": "FRUCTIS RIZOS PODE SH X350",
+      "marca": "FRUCTIS",
+      "quantity": 3,
+      "unit_price": 6960.67
+    }
+  ]
+}
+
+## Reglas estrictas
+1. Incluí TODOS los productos de TODAS las páginas — nunca omitas líneas
+2. NO incluyas cargos de envío/flete como si fueran productos
+3. ean: siempre el código de producto de la línea, sin importar el largo. sku: siempre null (lo completa el sistema después)
+4. name: copiá el texto de la factura tal cual, sin expandir abreviaturas ni corregir nada
+5. unit_price: el número crudo de la línea, sin restarle ni sumarle IVA vos — eso lo hace otro paso del sistema
+6. prices_include_iva: true o false según la lógica de arriba
+7. quantity: entero positivo
+8. Si un campo no aparece en la factura, usá null
+9. NO inventes productos ni datos que no estén en el documento`;
+
 type RawParsed = {
   invoice_number?: string;
   invoice_type?: string | null;
@@ -291,6 +355,10 @@ type RawParsed = {
   total_units?: number | string | null;
   item_count?: number | string | null;
   notes?: string | null;
+  // Only meaningful for docType "generic" — whether the line unit_price
+  // values already include IVA (retail/consumer invoices) or not
+  // (wholesale/Factura A with IVA discriminated separately).
+  prices_include_iva?: boolean | null;
   lines?: Array<{
     description?: string | null;
     name?: string | null;
@@ -340,6 +408,30 @@ export function parseClaudeJson(
     throw new Error("No se detectaron productos en la factura");
   }
 
+  // Generic invoices can be either wholesale (net prices) or retail-to-
+  // consumer (IVA-inclusive prices) — Claude only judges which case this is
+  // (prices_include_iva); the actual division happens here in code rather
+  // than trusting the model to do consistent arithmetic across every line.
+  let normalizedLines = lines;
+  if (docType === "generic" && parsed.prices_include_iva) {
+    const subtotalNum = parseArgentineNumber(parsed.subtotal);
+    const ivaNum = parseArgentineNumber(parsed.iva_amount);
+    const totalNum = parseArgentineNumber(parsed.total);
+    // Prefer total - iva_amount over the "subtotal" field: on invoices that
+    // disclose tax-inclusive pricing (Régimen de Transparencia Fiscal al
+    // Consumidor), "Subtotal" is often just a repeat of the final Total, not
+    // the true pre-tax base — total - iva_amount always is, by definition.
+    const base =
+      totalNum != null && ivaNum != null ? totalNum - ivaNum : subtotalNum;
+    const effectiveRate = base && base > 0 && ivaNum != null ? ivaNum / base : IVA_RATE;
+
+    normalizedLines = lines.map((line) =>
+      line.unit_price != null
+        ? { ...line, unit_price: roundCurrency(line.unit_price / (1 + effectiveRate)) }
+        : line
+    );
+  }
+
   const itemCount = parsed.item_count
     ? parseInt(String(parsed.item_count), 10)
     : undefined;
@@ -366,7 +458,7 @@ export function parseClaudeJson(
       : undefined,
     item_count: itemCount,
     notes: parsed.notes?.trim() || undefined,
-    lines,
+    lines: normalizedLines,
   };
 }
 
@@ -443,7 +535,9 @@ export async function extractInvoiceFromDocument(
       ? PEDIDO_EXTRACTION_PROMPT
       : docType === "nippon"
         ? NIPPON_EXTRACTION_PROMPT
-        : EXTRACTION_PROMPT;
+        : docType === "generic"
+          ? GENERIC_EXTRACTION_PROMPT
+          : EXTRACTION_PROMPT;
 
   const response = await client.messages.create({
     model,

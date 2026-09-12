@@ -44,7 +44,9 @@ export async function parseInvoiceDocument(
       ? "pedido"
       : docTypeRaw === "nippon"
         ? "nippon"
-        : "doan";
+        : docTypeRaw === "generic"
+          ? "generic"
+          : "doan";
 
   try {
     const buffer = Buffer.from(await file.arrayBuffer());

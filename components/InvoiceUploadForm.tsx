@@ -13,7 +13,7 @@ import type { InvoiceLineInput, ProcessInvoiceInput } from "@/lib/types";
 import { toast } from "sonner";
 
 type LineRow = InvoiceLineInput & { key: string };
-type DocType = "doan" | "pedido" | "nippon";
+type DocType = "doan" | "pedido" | "nippon" | "generic";
 
 function emptyLine(): LineRow {
   return {
@@ -259,6 +259,18 @@ export default function InvoiceUploadForm() {
                 }`}
               >
                 Factura Nippon
+              </button>
+              <button
+                type="button"
+                onClick={() => setDocType("generic")}
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  docType === "generic"
+                    ? "bg-[#E0457B] text-white"
+                    : "text-white/60 hover:text-white"
+                }`}
+                title="Para cualquier otro formato de factura — Claude detecta el proveedor y si el precio ya trae IVA incluido"
+              >
+                Cualquiera
               </button>
             </div>
           </div>

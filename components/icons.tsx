@@ -21,6 +21,20 @@ export function ExternalLinkIcon() {
   );
 }
 
+export function StarIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      className="h-4 w-4"
+      aria-hidden
+    >
+      <path d="M12 2.5 15.09 9l7.16.62-5.42 4.73L18.5 21 12 17.27 5.5 21l1.67-6.65L1.75 9.62 8.91 9 12 2.5Z" />
+    </svg>
+  );
+}
+
 export function ShoppingBagIcon() {
   return (
     <svg

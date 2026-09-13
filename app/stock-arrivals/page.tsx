@@ -5,7 +5,7 @@ import Link from "next/link";
 import { getStockArrivals } from "@/app/actions/stock-arrivals";
 import { formatPrice } from "@/lib/invoice-utils";
 import { doanSearchUrl, mercadoLibreSearchUrl } from "@/lib/marketplace-links";
-import { ExternalLinkIcon, ShoppingBagIcon } from "@/components/icons";
+import { ExternalLinkIcon, ShoppingBagIcon, StarIcon } from "@/components/icons";
 import { loadDismissedIds, saveDismissedIds } from "@/lib/dismissed-ids";
 import type { StockArrival } from "@/lib/types";
 import { toast } from "sonner";
@@ -142,6 +142,15 @@ export default function StockArrivalsPage() {
                     >
                       <td className="px-4 py-3 font-medium text-white">
                         <div className="flex items-center gap-2">
+                          {arrival.is_new && (
+                            <span
+                              title="Producto nuevo"
+                              aria-label="Producto nuevo"
+                              className="flex shrink-0 text-yellow-400"
+                            >
+                              <StarIcon />
+                            </span>
+                          )}
                           <span>{arrival.product_name}</span>
                           <button
                             type="button"
@@ -232,6 +241,15 @@ export default function StockArrivalsPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
+                      {arrival.is_new && (
+                        <span
+                          title="Producto nuevo"
+                          aria-label="Producto nuevo"
+                          className="flex shrink-0 text-yellow-400"
+                        >
+                          <StarIcon />
+                        </span>
+                      )}
                       <h3 className="truncate font-semibold text-white">
                         {arrival.product_name}
                       </h3>

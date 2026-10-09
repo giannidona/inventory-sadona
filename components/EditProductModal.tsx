@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { updateProduct } from "@/app/actions/inventory";
 import type { InventoryItem } from "@/lib/types";
+import SuggestInput, { useDistinctValues } from "@/components/SuggestInput";
 import { toast } from "sonner";
 
 type EditProductModalProps = {
@@ -61,6 +62,8 @@ function EditProductForm({
     product.unit_price != null ? String(product.unit_price) : ""
   );
   const [saving, setSaving] = useState(false);
+  const brands = useDistinctValues("marca");
+  const suppliers = useDistinctValues("supplier");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -112,18 +115,20 @@ function EditProductForm({
         />
       </Field>
       <Field label="Marca">
-        <input
+        <SuggestInput
           value={marca}
-          onChange={(e) => setMarca(e.target.value)}
-          className="input"
+          onChange={setMarca}
+          options={brands}
+          newLabel="Marca nueva"
         />
       </Field>
       <Field label="Proveedor">
-        <input
+        <SuggestInput
           value={supplier}
-          onChange={(e) => setSupplier(e.target.value)}
-          className="input"
+          onChange={setSupplier}
+          options={suppliers}
           placeholder="Ej: Doan, QPoint..."
+          newLabel="Proveedor nuevo"
         />
       </Field>
       <Field label="Precio unitario">

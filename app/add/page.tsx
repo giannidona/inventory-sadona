@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { addProduct } from "@/app/actions/inventory";
 import { createBrowserClient } from "@/lib/supabase/client";
+import SuggestInput, { useDistinctValues } from "@/components/SuggestInput";
 import { toast } from "sonner";
 
 function AddProductForm({ prefillEan }: { prefillEan: string }) {
@@ -18,6 +19,8 @@ function AddProductForm({ prefillEan }: { prefillEan: string }) {
   const [unitPrice, setUnitPrice] = useState("");
   const [saving, setSaving] = useState(false);
   const [skuStatus, setSkuStatus] = useState<"idle" | "checking" | "available" | "taken">("idle");
+  const brands = useDistinctValues("marca");
+  const suppliers = useDistinctValues("supplier");
 
   const checkSku = useCallback(async (value: string) => {
     if (!value.trim()) {
@@ -122,20 +125,22 @@ function AddProductForm({ prefillEan }: { prefillEan: string }) {
         </Field>
 
         <Field label="Marca">
-          <input
+          <SuggestInput
             value={marca}
-            onChange={(e) => setMarca(e.target.value)}
-            className="input"
-            placeholder="Ej: SADONA, L'Oréal..."
+            onChange={setMarca}
+            options={brands}
+            placeholder="Ej: SADONA, LOREAL..."
+            newLabel="Marca nueva"
           />
         </Field>
 
         <Field label="Proveedor">
-          <input
+          <SuggestInput
             value={supplier}
-            onChange={(e) => setSupplier(e.target.value)}
-            className="input"
+            onChange={setSupplier}
+            options={suppliers}
             placeholder="Ej: Doan, QPoint..."
+            newLabel="Proveedor nuevo"
           />
         </Field>
 

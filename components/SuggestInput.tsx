@@ -2,16 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
-
-// Clave de comparación: ignora mayúsculas, tildes, espacios y puntuación,
-// así "L'Oréal", "LOREAL" y "Loreal" se reconocen como la misma marca.
-export function normalizeKey(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toUpperCase()
-    .replace(/[^A-Z0-9]/g, "");
-}
+import { normalizeKey } from "@/lib/normalize";
 
 /** Valores distintos (ya existentes) de una columna de inventory, ordenados. */
 export function useDistinctValues(column: "marca" | "supplier"): string[] {

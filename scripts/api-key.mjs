@@ -2,6 +2,8 @@
 //
 //   node --env-file=.env scripts/api-key.mjs create "Web SADONA" public
 //   node --env-file=.env scripts/api-key.mjs create "Hermes" private
+//   node --env-file=.env scripts/api-key.mjs create "Hermes (escritura)" write
+//   node --env-file=.env scripts/api-key.mjs scope <id> write      (cambia el permiso de una key existente)
 //   node --env-file=.env scripts/api-key.mjs list
 //   node --env-file=.env scripts/api-key.mjs revoke <id>
 //
@@ -27,11 +29,11 @@ const [cmd, a, b] = process.argv.slice(2);
 if (cmd === "create") {
   const name = a;
   const scope = b;
-  if (!name || !["public", "private"].includes(scope)) {
-    console.error('Uso: create "<nombre>" <public|private>');
+  if (!name || !["public", "private", "write"].includes(scope)) {
+    console.error('Uso: create "<nombre>" <public|private|write>');
     process.exit(1);
   }
-  const key = `sdn_${scope === "public" ? "pub" : "prv"}_${randomBytes(24).toString("base64url")}`;
+  const key = `sdn_${scope === "public" ? "pub" : scope === "write" ? "wrt" : "prv"}_${randomBytes(24).toString("base64url")}`;
   const { error } = await supabase.from("api_keys").insert({
     name,
     scope,
@@ -62,6 +64,18 @@ if (cmd === "create") {
       estado: k.revoked_at ? "REVOCADA" : "activa",
     }))
   );
+} else if (cmd === "scope") {
+  // Cambia el permiso de una key YA existente (la key en sí no cambia, no hay que copiar nada).
+  if (!a || !["public", "private", "write"].includes(b)) {
+    console.error("Uso: scope <id> <public|private|write>");
+    process.exit(1);
+  }
+  const { data, error } = await supabase.from("api_keys").update({ scope: b }).eq("id", a).select("name").maybeSingle();
+  if (error || !data) {
+    console.error("Error:", error?.message ?? "No existe una key con ese id.");
+    process.exit(1);
+  }
+  console.log(`La key "${data.name}" ahora tiene scope ${b}.`);
 } else if (cmd === "revoke") {
   if (!a) {
     console.error("Uso: revoke <id>");
@@ -77,6 +91,6 @@ if (cmd === "create") {
   }
   console.log("Key revocada.");
 } else {
-  console.error("Comandos: create | list | revoke");
+  console.error("Comandos: create | list | scope | revoke");
   process.exit(1);
 }

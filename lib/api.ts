@@ -1,7 +1,10 @@
 import { createHash } from "node:crypto";
 import { createServiceClient } from "@/lib/supabase/server";
 
-export type ApiScope = "public" | "private";
+export type ApiScope = "public" | "private" | "write";
+
+// public < private < write: cada scope incluye todo lo del anterior
+const SCOPE_RANK: Record<ApiScope, number> = { public: 0, private: 1, write: 2 };
 
 type ApiKeyRecord = { id: string; name: string; scope: ApiScope };
 
@@ -20,7 +23,7 @@ function corsHeaders(request: Request): Record<string, string> {
   return {
     "Access-Control-Allow-Origin": allowed.includes("*") ? "*" : origin,
     "Access-Control-Allow-Headers": "Authorization, X-API-Key, Content-Type",
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
     Vary: "Origin",
   };
 }
@@ -70,7 +73,7 @@ function extractKey(request: Request): string | null {
 
 // Rate limit en memoria (ventana fija de 1 min por key). Es "best effort":
 // en serverless cada instancia lleva su propio contador.
-const RATE_LIMITS: Record<ApiScope, number> = { public: 120, private: 300 };
+const RATE_LIMITS: Record<ApiScope, number> = { public: 120, private: 300, write: 300 };
 const windows = new Map<string, { start: number; count: number }>();
 
 function checkRateLimit(key: ApiKeyRecord): { ok: boolean; retryAfter: number } {
@@ -128,14 +131,15 @@ export async function authenticate(
 
   const key = data as ApiKeyRecord;
 
-  // 'private' puede todo; 'public' solo lo público
-  if (required === "private" && key.scope !== "private") {
+  if (SCOPE_RANK[key.scope] < SCOPE_RANK[required]) {
     return {
       response: apiError(
         request,
         403,
         "insufficient_scope",
-        "Esta API key no tiene permiso para este recurso."
+        required === "write"
+          ? "Esta API key es de solo lectura. Para escribir hace falta una key con scope 'write'."
+          : "Esta API key no tiene permiso para este recurso."
       ),
     };
   }
@@ -201,6 +205,7 @@ export function productView(row: InventoryRow, scope: ApiScope) {
     unit_price: toNumber(row.unit_price),
   };
   if (scope === "public") return base;
+  // private y write ven lo mismo
   return {
     id: row.id,
     ...base,
@@ -253,4 +258,119 @@ export async function fetchAllInventory(
     if (chunk.length < page) break;
   }
   return rows;
+}
+
+// ---------------------------------------------------------------------------
+// Escritura
+// ---------------------------------------------------------------------------
+
+/** Lee el body JSON. Devuelve el objeto o una Response 400 lista para retornar. */
+export async function readJsonBody(
+  request: Request
+): Promise<{ body: Record<string, unknown> } | { response: Response }> {
+  try {
+    const body = await request.json();
+    if (body === null || typeof body !== "object" || Array.isArray(body)) {
+      throw new Error("not an object");
+    }
+    return { body: body as Record<string, unknown> };
+  } catch {
+    return {
+      response: apiError(request, 400, "invalid_json", "El body tiene que ser un objeto JSON."),
+    };
+  }
+}
+
+/** Busca productos por EAN o SKU (tolera ceros iniciales). */
+export async function findByCode(code: string): Promise<InventoryRow[]> {
+  const list = eanVariants(code)
+    .map((v) => `"${v.replace(/"/g, "")}"`)
+    .join(",");
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from("inventory")
+    .select(PRODUCT_COLUMNS)
+    .or(`ean.in.(${list}),sku.in.(${list})`)
+    .limit(5);
+  if (error) throw new Error(error.message);
+  return (data ?? []) as unknown as InventoryRow[];
+}
+
+/** Registra una escritura hecha por la API (antes/después), para poder auditar o recuperar. */
+export async function logAudit(entry: {
+  key: { id: string; name: string };
+  action: "create" | "update" | "stock" | "delete";
+  productId: string | null;
+  productEan: string | null;
+  before: unknown;
+  after: unknown;
+}): Promise<void> {
+  const supabase = createServiceClient();
+  const { error } = await supabase.from("api_audit_log").insert({
+    api_key_id: entry.key.id,
+    api_key_name: entry.key.name,
+    action: entry.action,
+    product_id: entry.productId,
+    product_ean: entry.productEan,
+    before: entry.before ?? null,
+    after: entry.after ?? null,
+  });
+  // El audit nunca debe tumbar la operación, pero queremos enterarnos si falla.
+  if (error) console.error("[api_audit_log]", error.message);
+}
+
+export type ValidationResult<T> = { value: T } | { error: string };
+
+export function validateEan(raw: unknown): ValidationResult<string | null> {
+  if (raw === null || raw === "") return { value: null };
+  if (typeof raw !== "string" && typeof raw !== "number") {
+    return { error: "'ean' tiene que ser texto con solo dígitos." };
+  }
+  const s = String(raw).trim();
+  if (!/^\d{6,14}$/.test(s)) {
+    return { error: "'ean' tiene que tener entre 6 y 14 dígitos, sin espacios ni guiones." };
+  }
+  return { value: s };
+}
+
+export function validateText(
+  raw: unknown,
+  field: string,
+  max: number
+): ValidationResult<string | null> {
+  if (raw === null) return { value: null };
+  if (typeof raw !== "string") return { error: `'${field}' tiene que ser texto.` };
+  const s = raw.trim().replace(/\s+/g, " ");
+  if (s.length > max) return { error: `'${field}' no puede superar ${max} caracteres.` };
+  return { value: s || null };
+}
+
+export function validatePrice(raw: unknown): ValidationResult<number | null> {
+  if (raw === null) return { value: null };
+  if (typeof raw !== "number" || !Number.isFinite(raw) || raw < 0 || raw > 1e9) {
+    return { error: "'unit_price' tiene que ser un número mayor o igual a 0 (costo neto, sin IVA)." };
+  }
+  return { value: Math.round(raw * 100) / 100 };
+}
+
+export function validateInt(
+  raw: unknown,
+  field: string,
+  min: number
+): ValidationResult<number> {
+  if (typeof raw !== "number" || !Number.isInteger(raw) || raw < min || raw > 1e7) {
+    return { error: `'${field}' tiene que ser un entero${min >= 0 ? " mayor o igual a " + min : ""}.` };
+  }
+  return { value: raw };
+}
+
+/** Marca/proveedor ya existentes (para reutilizar la misma escritura y no crear variantes). */
+export async function existingValues(column: "marca" | "supplier"): Promise<string[]> {
+  const rows = await fetchAllInventory(`id, ${column}`);
+  const set = new Set<string>();
+  for (const r of rows) {
+    const v = (r as unknown as Record<string, string | null>)[column]?.trim();
+    if (v) set.add(v);
+  }
+  return [...set];
 }

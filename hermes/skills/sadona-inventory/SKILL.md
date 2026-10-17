@@ -43,7 +43,8 @@ curl -s -H "Authorization: Bearer $SADONA_API_KEY" "$SADONA_API_URL/products?q=d
 | Sin stock | `GET /out-of-stock?limit=` (los que se quedaron sin stock más recientemente, primero) |
 | Stock bajo | `GET /low-stock?threshold=5&include_zero=false&limit=` |
 | Marcas | `GET /brands` (marca, cantidad de productos, unidades) |
-| Ingresos por factura | `GET /arrivals?since=YYYY-MM-DD&is_new=true&limit=` (trae `old_price` si el precio cambió) |
+| Ingresos (factura y manuales) | `GET /arrivals?since=YYYY-MM-DD&is_new=true&limit=` (trae `old_price` si el precio cambió y `source`: invoice\|manual) |
+| Registrar ingreso manual | `POST /arrivals` (ver sección "Ingreso manual") |
 | Movimientos de stock | `GET /movements?ean=<ean>&type=in\|out&since=YYYY-MM-DD&limit=` |
 | Resumen y más vendidos | `GET /stats?low_stock_threshold=5&top=10` |
 
@@ -74,6 +75,26 @@ curl -s -X POST -H "Authorization: Bearer $SADONA_API_KEY" -H "Content-Type: app
 7. Si la API responde `409 duplicate`, el producto ya existe: mostralo y ofrecé editar o ajustar stock en vez de crear otro.
 8. Después de escribir, confirmá en una línea lo que quedó (nombre y stock/precio nuevos), tomado de la respuesta de la API.
 9. `unit_price` es costo **neto sin IVA**. Si el usuario da un precio con IVA, dividilo por 1,21 y avisalo antes de confirmar.
+
+## Ingreso manual de mercadería (EAN + costo + stock + proveedor)
+
+Cuando el usuario dice algo como "entraron 12 del 7791293049694, costo 3500 con IVA, lo compré en Doan", registralo con `POST /arrivals`. Suma al stock, actualiza el costo neto y el proveedor, y crea el producto si no existe.
+
+```bash
+curl -s -X POST -H "Authorization: Bearer $SADONA_API_KEY" -H "Content-Type: application/json" \
+  -d '{"ean":"7791293049694","quantity":12,"cost":3500,"price_includes_iva":true,"supplier":"Doan","dry_run":true}' \
+  "$SADONA_API_URL/arrivals"
+```
+
+Flujo obligatorio:
+1. Sacá del mensaje: `ean`, `quantity`, `cost`, `supplier`. **IVA:** si dio costo y no dijo si es con o sin IVA, **preguntá** (nunca lo supongas). "con IVA" -> `price_includes_iva: true` (la API divide por 1,21); "sin IVA"/"neto" -> `false`. Si menciona otra alícuota (10,5%) mandá `iva_rate: 0.105`.
+2. **Siempre primero con `"dry_run": true`.** No escribe nada. Mostrá un resumen corto con lo que devuelve: producto, stock (de -> a), costo (de -> a, y el cálculo si se sacó IVA), proveedor y `warnings`.
+3. Pedí confirmación explícita. Recién con un "sí/dale" repetí el mismo pedido **sin** `dry_run` (o con `false`).
+4. Si responde `422 needs_name`, el EAN es nuevo: pedí el nombre (y la marca) al usuario; no los inventes. Incluí `name` y `marca` en el pedido.
+5. `quantity` es lo que **entró** (se suma), no el stock total. Si el usuario dice "ahora tengo 20", eso es un recuento: usá `/products/<ean>/stock` con `set`.
+6. Varios productos: procesá uno por vez; antes de escribir cualquiera, mostrá la lista completa con los dry_run y pedí una sola confirmación para todos. Si uno falla, avisá cuáles quedaron cargados.
+7. Si hay warnings (salto de costo de 30% o más, marca nueva, proveedor reescrito), mencionalos antes de confirmar: puede ser un error de tipeo.
+8. Al terminar, confirmá en una línea: nombre, stock nuevo y costo neto.
 
 ## Cómo interpretar los datos
 

@@ -130,6 +130,9 @@ export type StockArrival = {
   // price stayed the same, in which case unit_price is just shown as-is.
   old_price: number | null;
   is_new: boolean;
+  // 'manual' = ingreso cargado a mano / por API (sin factura); supplier se guarda en el propio ingreso
+  source?: string | null;
+  supplier?: string | null;
   created_at: string;
   invoices?: { invoice_number: string } | null;
 };

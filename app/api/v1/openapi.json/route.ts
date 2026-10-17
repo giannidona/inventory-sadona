@@ -208,6 +208,40 @@ const spec = {
         ],
         responses: { "200": { description: "OK" } },
       },
+      post: {
+        summary: "Registrar un ingreso manual (compra sin factura) (scope write)",
+        description:
+          "Suma `quantity` al stock, actualiza el costo neto y el proveedor (\"dónde se compró\"). Si el EAN no existe lo crea (hace falta `name`). Si viene `cost`, `price_includes_iva` es obligatorio (true = se le saca el IVA con `iva_rate`, default 0.21). `dry_run: true` no escribe nada y devuelve la vista previa (stock, costo neto calculado, advertencias) para confirmar. Queda en Ingresos (marcado como manual) y en movimientos.",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["ean"],
+                properties: {
+                  ean: { type: "string", description: "6-14 dígitos" },
+                  quantity: { type: "integer", minimum: 0, description: "Unidades que entraron (se suman)" },
+                  cost: { type: "number", minimum: 0, description: "Costo unitario de compra" },
+                  price_includes_iva: { type: "boolean", description: "Obligatorio si hay cost" },
+                  iva_rate: { type: "number", enum: [0, 0.105, 0.21, 0.27], default: 0.21 },
+                  supplier: { type: "string" },
+                  name: { type: "string", description: "Obligatorio solo si el EAN es nuevo" },
+                  marca: { type: "string", description: "Solo productos nuevos" },
+                  dry_run: { type: "boolean" },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": { description: "Actualizado (o vista previa si dry_run)" },
+          "201": { description: "Producto creado" },
+          "400": { description: "Datos inválidos / falta price_includes_iva" },
+          "409": { description: "Conflicto de stock" },
+          "422": { description: "EAN nuevo sin name" },
+        },
+      },
     },
     "/movements": {
       get: {

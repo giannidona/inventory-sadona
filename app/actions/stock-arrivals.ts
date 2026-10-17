@@ -29,10 +29,13 @@ export async function getStockArrivals() {
 
   const data = (arrivalsRes.data ?? []).map((arrival) => ({
     ...arrival,
+    // Ingresos manuales guardan el precio anterior en la propia fila; los de factura
+    // lo sacan de price_changes.
     old_price:
-      arrival.invoice_id && arrival.inventory_id
+      arrival.old_price ??
+      (arrival.invoice_id && arrival.inventory_id
         ? (oldPriceByKey.get(`${arrival.invoice_id}:${arrival.inventory_id}`) ?? null)
-        : null,
+        : null),
   }));
 
   return { success: true as const, data };

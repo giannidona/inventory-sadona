@@ -188,6 +188,8 @@ export default function StockArrivalsPage() {
                           >
                             {arrival.invoices?.invoice_number ?? "Ver factura"}
                           </Link>
+                        ) : arrival.source === "manual" ? (
+                          <ManualBadge supplier={arrival.supplier} />
                         ) : (
                           <span className="text-white/30">—</span>
                         )}
@@ -315,6 +317,8 @@ export default function StockArrivalsPage() {
                     >
                       {arrival.invoices?.invoice_number ?? "Ver factura"}
                     </Link>
+                  ) : arrival.source === "manual" ? (
+                    <ManualBadge supplier={arrival.supplier} />
                   ) : (
                     <span>—</span>
                   )}
@@ -382,6 +386,15 @@ function PriceDelta({
       {increased ? "▲" : "▼"} {formatPrice(Math.abs(diff))} (
       {increased ? "+" : "−"}
       {Math.abs(pct).toFixed(1)}%)
+    </span>
+  );
+}
+
+// Ingreso cargado a mano / por WhatsApp (sin factura): muestra dónde se compró.
+function ManualBadge({ supplier }: { supplier?: string | null }) {
+  return (
+    <span className="text-xs font-medium text-white/60">
+      Manual{supplier ? ` · ${supplier}` : ""}
     </span>
   );
 }

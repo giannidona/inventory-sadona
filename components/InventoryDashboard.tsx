@@ -11,6 +11,7 @@ import MovementsModal from "@/components/MovementsModal";
 import QuickStockAdjust from "@/components/QuickStockAdjust";
 import ScanStockModal from "@/components/ScanStockModal";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { scoreProduct, tokenizeQuery } from "@/lib/search";
 import {
   calculateInvestmentWithIva,
   formatPrice,
@@ -131,15 +132,25 @@ export default function InventoryDashboard({
   }, [lowStockOnly, locked]);
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    let list = !q
-      ? items
-      : items.filter(
-          (item) =>
-            item.name.toLowerCase().includes(q) ||
-            item.sku.toLowerCase().includes(q) ||
-            (item.ean?.toLowerCase().includes(q) ?? false)
+    const tokens = tokenizeQuery(search);
+    const scores = new Map<string, number>();
+    let list = items;
+    if (tokens.length > 0) {
+      list = items.filter((item) => {
+        const s = scoreProduct(tokens, item);
+        if (s === null) return false;
+        scores.set(item.id, s);
+        return true;
+      });
+      // Con el orden por defecto, lo más relevante primero (después alfabético).
+      if (sortMode === "name") {
+        list = [...list].sort(
+          (a, b) =>
+            (scores.get(b.id) ?? 0) - (scores.get(a.id) ?? 0) ||
+            a.name.localeCompare(b.name)
         );
+      }
+    }
 
     if (lockToOutOfStock) {
       list = list.filter((item) => item.stock === 0);

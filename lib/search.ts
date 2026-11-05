@@ -32,7 +32,7 @@ function tokenScore(token: string, words: string[], compact: string): number {
     if (w.startsWith(token)) best = Math.max(best, 3);
     else if (token.length >= 2 && w.includes(token)) best = Math.max(best, 2);
     // abreviaturas y plurales: "ant" -> "anti", "cremas" -> "crema"
-    else if (w.length >= 3 && token.startsWith(w)) best = Math.max(best, 1.5);
+    else if (w.length >= 3 && !/^\d+$/.test(w) && token.startsWith(w)) best = Math.max(best, 1.5);
   }
   if (best > 0) return best;
   // "fps 50" vs "fps50": comparar sin espacios
@@ -46,6 +46,22 @@ function tokenScore(token: string, words: string[], compact: string): number {
  */
 export function scoreProduct(tokens: string[], item: Searchable): number | null {
   if (tokens.length === 0) return 0;
+
+  // Búsqueda por código (EAN/SKU): solo se mira EAN y SKU, nunca el nombre, y
+  // los ceros iniciales no importan (044432 = 44432). Evita que "4006000017396"
+  // traiga productos cuyo nombre tiene "400".
+  if (tokens.length === 1 && /^\d{6,}$/.test(tokens[0])) {
+    const q = tokens[0].replace(/^0+/, "");
+    let best = 0;
+    for (const code of [item.ean, item.sku]) {
+      const c = (code ?? "").replace(/\D/g, "").replace(/^0+/, "");
+      if (!c || !q) continue;
+      if (c === q) best = Math.max(best, 10);
+      else if (c.startsWith(q) || q.startsWith(c) === false && c.includes(q)) best = Math.max(best, 5);
+    }
+    return best > 0 ? best : null;
+  }
+
   const nameWords = clean(item.name).split(" ").filter(Boolean);
   const words = [
     ...nameWords,

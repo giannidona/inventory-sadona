@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { updateStock } from "@/app/actions/inventory";
+import { undoMovement, updateStock } from "@/app/actions/inventory";
 import type { InventoryItem } from "@/lib/types";
 
 type Mode = "subtract" | "add";
@@ -17,7 +17,7 @@ type Pending = {
 type PendingView = { id: string; name: string; delta: number };
 
 type LogEntry =
-  | { id: number; at: Date; kind: "ok"; name: string; delta: number; stock: number }
+  | { id: number; at: Date; kind: "ok"; name: string; delta: number; stock: number; movementId?: string; inventoryId: string }
   | { id: number; at: Date; kind: "error"; name: string; message: string }
   | { id: number; at: Date; kind: "notfound"; code: string };
 
@@ -66,6 +66,7 @@ export default function GunScannerModal({ items, onClose, onStockChanged }: Prop
   const [value, setValue] = useState("");
   const [log, setLog] = useState<LogEntry[]>([]);
   const [pendingView, setPendingView] = useState<PendingView[]>([]);
+  const [undoing, setUndoing] = useState<Set<number>>(new Set());
   const inputRef = useRef<HTMLInputElement>(null);
 
   const pendingRef = useRef(new Map<string, Pending>());
@@ -127,7 +128,14 @@ export default function GunScannerModal({ items, onClose, onStockChanged }: Prop
       if (result.success && result.data) {
         projectedRef.current.set(id, result.data.stock + pendingSigned(id));
         onStockChangedRef.current(id, result.data.stock);
-        addLog({ kind: "ok", name: p.name, delta, stock: result.data.stock });
+        addLog({
+          kind: "ok",
+          name: p.name,
+          delta,
+          stock: result.data.stock,
+          movementId: result.data.movementId,
+          inventoryId: id,
+        });
       } else {
         // No se guardó: descartar lo proyectado y volver al stock real conocido.
         const real = itemsRef.current.find((i) => i.id === id)?.stock ?? 0;
@@ -177,6 +185,41 @@ export default function GunScannerModal({ items, onClose, onStockChanged }: Prop
     p.timer = setTimeout(() => flush(item.id), FLUSH_MS);
     syncView();
     beep(true);
+  }
+
+  /** Saca un escaneo pendiente (todavía no guardado) sin tocar la base. */
+  function cancelPending(id: string) {
+    const p = pendingRef.current.get(id);
+    if (!p) return;
+    clearTimeout(p.timer);
+    pendingRef.current.delete(id);
+    const real = itemsRef.current.find((i) => i.id === id)?.stock ?? 0;
+    projectedRef.current.set(id, real);
+    syncView();
+  }
+
+  /** Deshace un movimiento ya guardado: devuelve el stock y borra el registro. */
+  async function undoEntry(entry: Extract<LogEntry, { kind: "ok" }>) {
+    if (!entry.movementId || undoing.has(entry.id)) return;
+    setUndoing((prev) => new Set(prev).add(entry.id));
+    const result = await undoMovement(entry.movementId);
+    setUndoing((prev) => {
+      const next = new Set(prev);
+      next.delete(entry.id);
+      return next;
+    });
+    if (result.success && result.data) {
+      projectedRef.current.set(
+        result.data.inventoryId,
+        result.data.stock + pendingSigned(result.data.inventoryId)
+      );
+      onStockChangedRef.current(result.data.inventoryId, result.data.stock);
+      setLog((prev) => prev.filter((e) => e.id !== entry.id));
+    } else if (!result.success) {
+      addLog({ kind: "error", name: entry.name, message: result.error });
+      beep(false);
+    }
+    inputRef.current?.focus();
   }
 
   async function changeMode(next: Mode) {
@@ -296,12 +339,22 @@ export default function GunScannerModal({ items, onClose, onStockChanged }: Prop
                     <span className="min-w-0 truncate text-sm font-medium text-white">
                       {p.name}
                     </span>
-                    <span
-                      className={`shrink-0 text-2xl font-bold tabular-nums ${
-                        p.delta < 0 ? "text-red-400" : "text-green-400"
-                      }`}
-                    >
-                      {signed(p.delta)}
+                    <span className="flex shrink-0 items-center gap-3">
+                      <span
+                        className={`text-2xl font-bold tabular-nums ${
+                          p.delta < 0 ? "text-red-400" : "text-green-400"
+                        }`}
+                      >
+                        {signed(p.delta)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => cancelPending(p.id)}
+                        title="Cancelar este escaneo"
+                        className="rounded-md p-1 text-white/40 transition-colors hover:bg-white/10 hover:text-white"
+                      >
+                        ✕
+                      </button>
                     </span>
                   </div>
                 ))
@@ -333,6 +386,17 @@ export default function GunScannerModal({ items, onClose, onStockChanged }: Prop
                     <span className="w-16 text-right text-xs tabular-nums text-white/40">
                       stock {e.stock}
                     </span>
+                    {e.movementId && (
+                      <button
+                        type="button"
+                        disabled={undoing.has(e.id)}
+                        onClick={() => void undoEntry(e)}
+                        title="Deshacer este movimiento (devuelve el stock y lo borra del historial)"
+                        className="rounded-md p-1 text-white/40 transition-colors hover:bg-red-500/20 hover:text-red-300 disabled:opacity-40"
+                      >
+                        ✕
+                      </button>
+                    )}
                   </div>
                 ) : e.kind === "error" ? (
                   <div key={e.id} className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">

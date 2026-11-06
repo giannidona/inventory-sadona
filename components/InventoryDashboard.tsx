@@ -13,6 +13,7 @@ import ScanStockModal from "@/components/ScanStockModal";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { scoreProduct, tokenizeQuery } from "@/lib/search";
 import { fetchAllInventory } from "@/lib/inventory-client";
+import GunScannerModal from "@/components/GunScannerModal";
 import {
   calculateInvestmentWithIva,
   formatPrice,
@@ -86,6 +87,7 @@ export default function InventoryDashboard({
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [scanProduct, setScanProduct] = useState<InventoryItem | null>(null);
   const [notFoundEan, setNotFoundEan] = useState<string | null>(null);
+  const [gunOpen, setGunOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -451,27 +453,36 @@ export default function InventoryDashboard({
 
         {!locked && (
           <div className="flex flex-col gap-3">
-            {cameraActive ? (
+            <div className="flex flex-col gap-2 sm:flex-row">
+              {cameraActive ? (
+                <button
+                  type="button"
+                  onClick={closeCamera}
+                  className="w-full rounded-xl bg-red-500 py-3 text-sm font-bold text-white transition-colors hover:bg-red-600 sm:w-auto sm:px-6"
+                >
+                  ✕ Cerrar cámara
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCameraError(null);
+                    setCameraActive(true);
+                  }}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#E0457B] py-3 text-sm font-semibold text-white transition-colors hover:bg-[#c93a6a] sm:w-auto sm:px-6"
+                >
+                  <CameraIcon />
+                  Escanear
+                </button>
+              )}
               <button
                 type="button"
-                onClick={closeCamera}
-                className="w-full rounded-xl bg-red-500 py-3 text-sm font-bold text-white transition-colors hover:bg-red-600 sm:w-auto sm:px-6"
+                onClick={() => setGunOpen(true)}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/15 py-3 text-sm font-semibold text-white transition-colors hover:bg-white/5 sm:w-auto sm:px-6"
               >
-                ✕ Cerrar cámara
+                Pistola scanner
               </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => {
-                  setCameraError(null);
-                  setCameraActive(true);
-                }}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#E0457B] py-3 text-sm font-semibold text-white transition-colors hover:bg-[#c93a6a] sm:w-auto sm:px-6"
-              >
-                <CameraIcon />
-                Escanear
-              </button>
-            )}
+            </div>
 
             {cameraActive && (
               <div className="space-y-2">
@@ -697,6 +708,14 @@ export default function InventoryDashboard({
         onConfirm={handleDelete}
         onCancel={() => setDeleteTarget(null)}
       />
+
+      {gunOpen && (
+        <GunScannerModal
+          items={items}
+          onClose={() => setGunOpen(false)}
+          onStockChanged={updateLocalStock}
+        />
+      )}
 
       {scanProduct && (
         <ScanStockModal

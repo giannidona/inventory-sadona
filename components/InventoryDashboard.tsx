@@ -12,6 +12,7 @@ import QuickStockAdjust from "@/components/QuickStockAdjust";
 import ScanStockModal from "@/components/ScanStockModal";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { scoreProduct, tokenizeQuery } from "@/lib/search";
+import { fetchAllInventory } from "@/lib/inventory-client";
 import {
   calculateInvestmentWithIva,
   formatPrice,
@@ -90,11 +91,7 @@ export default function InventoryDashboard({
     let cancelled = false;
 
     async function load() {
-      const supabase = createBrowserClient();
-      const { data, error } = await supabase
-        .from("inventory")
-        .select("*")
-        .order("name");
+      const { data, error } = await fetchAllInventory();
 
       if (cancelled) return;
 
@@ -273,11 +270,7 @@ export default function InventoryDashboard({
   }
 
   async function refreshItems() {
-    const supabase = createBrowserClient();
-    const { data, error } = await supabase
-      .from("inventory")
-      .select("*")
-      .order("name");
+    const { data, error } = await fetchAllInventory();
 
     if (error) {
       toast.error("Error al cargar inventario");
